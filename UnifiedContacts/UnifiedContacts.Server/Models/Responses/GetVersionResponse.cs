@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using UnifiedContacts.Settings;
 
 namespace UnifiedContacts.Models.Responses
 {
@@ -11,10 +12,15 @@ namespace UnifiedContacts.Models.Responses
         public string Version { get; set; }
 
         /// <summary>
+        /// Edition of the UnifiedContacts environment
+        /// </summary>
+        [JsonPropertyName("edition")]
+        public string Edition { get; set; } = StaticSettings.EDITION;
+
+        /// <summary>
         /// Default constructor
         /// </summary>
         /// <param name="version">Version of UnifiedContacts environemnt</param>
-        /// <param name="edition">Edition of the UnifiedContacts environment</param>
         [JsonConstructor]
         public GetVersionResponse(string version)
         {

@@ -24,10 +24,9 @@
         }
         #refresh Context
         $context = Get-AzContext
-        $User = (az account show --query user.name --output tsv)
         $appService = Get-AzWebApp -ResourceGroupName  $ResourceGroup -Name $AppServiceName
     
-        $me = Get-AzADUser -UserPrincipalName $User
+        $me = Get-SignedInUser
         $storageAccountName = ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq "StorageAccountName" }).value 
         try {
             Remove-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Blob Data Contributor" | Out-Null
@@ -50,13 +49,19 @@
         Write-Host "Reset of Unified Contacts was succesful" -ForegroundColor Green
     }
     catch {
+        Write-DetailedError -ErrorRecord $_ -Step "Reset"
         if ($appService) {
-            ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq "WEBSITE_RUN_FROM_PACKAGE" }).value = "https://unifiedcontacts.blob.core.windows.net/unified-contacts-releases/stable/1.4.0/ucPublish_1.4.0_824b8e82-0fd0-4b7e-b220-bdc90fdf4f69.zip"
-            $settings = @{}
-            foreach ($appsetting in $appService.SiteConfig.AppSettings) {
-                $settings.add($appsetting.Name, $appsetting.Value)
+            try {
+                ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq "WEBSITE_RUN_FROM_PACKAGE" }).value = "https://unifiedcontacts.blob.core.windows.net/unified-contacts-releases/stable/1.4.0/ucPublish_1.4.0_824b8e82-0fd0-4b7e-b220-bdc90fdf4f69.zip"
+                $settings = @{}
+                foreach ($appsetting in $appService.SiteConfig.AppSettings) {
+                    $settings.add($appsetting.Name, $appsetting.Value)
+                }
+                Set-AzWebApp -ResourceGroupName $ResourceGroup -Name $AppServiceName -AppSettings $settings | Out-Null
             }
-            Set-AzWebApp -ResourceGroupName $ResourceGroup -Name $AppServiceName -AppSettings $settings | Out-Null
+            catch {
+                Write-Warning "Could not restore app settings: $($_.Exception.Message)"
+            }
         }
         Write-Host "Reset of Unified Contacts has failed. Please try to run Reset-UnifiedContacts again or go to the Unified Contacts Admin center to update to the newest version." -ForegroundColor Red
     }

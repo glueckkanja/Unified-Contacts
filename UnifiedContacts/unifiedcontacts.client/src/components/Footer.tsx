@@ -59,7 +59,7 @@ export const FooterPage = (props: FooterProps) => {
         <span>
           {`© ${new Date().getFullYear()} - `}
           {getUpdateNotification(props.versionInfo?.version)}
-          {`${StaticSettings.version} ${props.versionInfo?.edition}`}
+          {`${StaticSettings.version} ${props.versionInfo?.edition ?? ""}`.trim()}
         </span>
       );
     } else {
@@ -67,7 +67,7 @@ export const FooterPage = (props: FooterProps) => {
         <span>
           {`Copyright © ${new Date().getFullYear()} glueckkanja AG - `}
           {getUpdateNotification(props.versionInfo?.version)}
-          {`${StaticSettings.version} ${props.versionInfo?.edition}`}
+          {`${StaticSettings.version} ${props.versionInfo?.edition ?? ""}`.trim()}
         </span>
       );
     }

@@ -88,6 +88,15 @@ jobs:
         dotnet restore "${{ env.WORKING_DIRECTORY }}" --configfile "./nuget.config"
       shell: pwsh
 
+    - name: Stamp version into server and client
+      run: |
+        $version = "${{ steps.get-version.outputs.version }}"
+        foreach ($file in @("UnifiedContacts/UnifiedContacts.Server/Settings/StaticSettings.cs", "UnifiedContacts/unifiedcontacts.client/src/StaticSettings.ts")) {
+          (Get-Content $file -Raw) -replace '/INTERNAL_BUILD/', $version | Set-Content $file -Encoding UTF8
+          Write-Host "Stamped version $version into $file"
+        }
+      shell: pwsh
+
     - name: Install Node.js dependencies
       run: |
         cd UnifiedContacts/unifiedcontacts.client

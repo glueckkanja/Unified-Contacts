@@ -11,7 +11,7 @@ Foreach($import in @($Private + $Public))
     Try
     {
         .$import.fullname
-        Write-Output "$($import.fullname)"
+        Write-Verbose "Imported $($import.fullname)"
     }
     Catch
     {

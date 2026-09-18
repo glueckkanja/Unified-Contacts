@@ -10,8 +10,7 @@ function Get-LatestModuleVersion {
             $latestVersion = $latestModule.Version
 
             if ($installedVersion -lt $latestVersion) {
-                Write-Warning "You have version $installedVersion of $ModuleName installed, but the latest version is $latestVersion."
-                exit 1;
+                throw "You have version $installedVersion of $ModuleName installed, but the latest version is $latestVersion. Please update the module first: Update-Module $ModuleName"
             }
         }
     }
@@ -19,10 +18,9 @@ function Get-LatestModuleVersion {
     $ModuleName = "AzTable"
     if ($null -eq (Get-InstalledModule -Name $ModuleName -ErrorAction SilentlyContinue)) {
         Write-Host "Installing required module $($ModuleName)" -ForegroundColor Green
-        Install-Module AzTable
+        Install-Module $ModuleName -Scope CurrentUser -Force
         if ($null -eq (Get-InstalledModule -Name $ModuleName -ErrorAction SilentlyContinue)) {
-            Write-Error "Failed to install module $($ModuleName)"
-            exit 1;
+            throw "Failed to install module $($ModuleName)"
         }
     }
 }
