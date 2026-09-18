@@ -84,7 +84,7 @@ namespace UnifiedContacts.Controllers
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
                 }))?.Value!.FirstOrDefault();
-                if (oauth2PermissionGrant == null && oauth2PermissionGrant?.Scope == null)
+                if (oauth2PermissionGrant == null || oauth2PermissionGrant.Scope == null)
                 {
                     return new GetDependenciesStatusDependency(UnifiedContactStaticStrings.HEALTH_STATE_DISPLAY_NAME_TEAMS_APP_REGISTRATION, DependencyStatus.WARNING, "Admin constent not granted");
                 }
