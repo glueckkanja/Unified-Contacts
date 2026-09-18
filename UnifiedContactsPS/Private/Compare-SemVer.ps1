@@ -4,13 +4,15 @@ function Compare-SemVer {
         [string]$Version2
     )
 
-    $v1 = [version]$Version1
-    $v2 = [version]$Version2
-
-    if ($v1 -ge $v2) {
-        return $true
+    # Normalize GitHub tags like 'v1.2.3', 'v.1.2.3' or 'v1.2.3-dev-abc123' to a plain version
+    function ConvertTo-PlainVersion([string]$Version) {
+        $normalized = $Version.Trim() -replace '^[vV]\.?', ''
+        $normalized = ($normalized -split '[-+]')[0]
+        return [version]$normalized
     }
-    elseif ($v1 -lt $v2) {
-        return $false
-    } 
+
+    $v1 = ConvertTo-PlainVersion $Version1
+    $v2 = ConvertTo-PlainVersion $Version2
+
+    return $v1 -ge $v2
 }

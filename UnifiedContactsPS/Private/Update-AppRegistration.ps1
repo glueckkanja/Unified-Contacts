@@ -24,23 +24,42 @@ function Update-AppRegistration {
 
 
     $api = $App.Api
-    $api.GetType()
     $api.Oauth2PermissionScope = $permissionScope
     $api.RequestedAccessTokenVersion = $RequestedAccessTokenVersion
-    
+
+    # Newly created app registrations may not be replicated in Microsoft Graph yet
+    $timeout = (Get-Date).AddMinutes(5)
+    while ($null -eq (Get-AzADApplication -ObjectId $App.Id -ErrorAction SilentlyContinue) -and (Get-Date) -lt $timeout) {
+        Start-Sleep -Seconds 10
+    }
+
     if ($AddAppRole) {
         $appRole = New-Object Microsoft.Azure.PowerShell.Cmdlets.Resources.MSGraph.Models.ApiV10.MicrosoftGraphAppRole
-        $appRole.AllowedMemberType = { Application }
+        $appRole.AllowedMemberType = @("Application")
         $appRole.Description = "Allows to read and write (create, update, delete) database contacts"
         $appRole.DisplayName = "Contacts.Database.ReadWrite.All"
         $appRole.Id = New-Guid
         $appRole.IsEnabled = $true
         $appRole.Value = "Contacts.Database.ReadWrite.All"
-    
-        Update-AzADApplication -ObjectId $App.Id -Api $api -AppRole $appRole -IdentifierUri $ApplicationIdUri | Out-Null
     }
-    else {
-        Update-AzADApplication -ObjectId $App.Id -Api $api -IdentifierUri $ApplicationIdUri | Out-Null
+
+    $tryCount = 0
+    while ($true) {
+        try {
+            if ($AddAppRole) {
+                Update-AzADApplication -ObjectId $App.Id -Api $api -AppRole $appRole -IdentifierUri $ApplicationIdUri | Out-Null
+            }
+            else {
+                Update-AzADApplication -ObjectId $App.Id -Api $api -IdentifierUri $ApplicationIdUri | Out-Null
+            }
+            break
+        }
+        catch {
+            $tryCount++
+            # Retry NotFound - Graph replication can lag behind Get-AzADApplication
+            if ($tryCount -ge 6 -or $_.Exception.Message -notmatch 'NotFound') { throw }
+            Start-Sleep -Seconds 10
+        }
     }
     $graphID = "00000003-0000-0000-c000-000000000000" 
 
@@ -52,7 +71,7 @@ function Update-AppRegistration {
         $logoUri = "https://graph.microsoft.com/v1.0/applications/$($App.Id)/logo"
         $graphTokenSecure = Get-AzAccessToken -ResourceUrl https://graph.microsoft.com -AsSecureString
         # Convert SecureString to plain text for API call
-        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($graphTokenSecure)
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($graphTokenSecure.Token)
         $graphToken = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
         $header = @{"Authorization" = "Bearer $graphToken" } 
         Invoke-WebRequest -Uri  "https://unifiedcontacts.blob.core.windows.net/arm-templates/Unified-Contacts-Pro-350.png" -OutFile "./Unified-Contacts-Pro-350.png" | Out-Null
@@ -83,5 +102,5 @@ function Set-TeamsAsAuthorizedClientApplication {
         $api.PreAuthorizedApplication += $PreAuthorizedApplicationObject
     }
 
-    Update-AzADApplication -ObjectId $App.Id -Api $api 
+    Update-AzADApplication -ObjectId $App.Id -Api $api | Out-Null
 }

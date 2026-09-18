@@ -98,6 +98,14 @@ jobs:
         cd UnifiedContacts/unifiedcontacts.client
         npm run build
 
+    - name: Stamp version into server
+      run: |
+        $staticSettingsPath = "UnifiedContacts/UnifiedContacts.Server/Settings/StaticSettings.cs"
+        $version = "${{ steps.get-version.outputs.version }}"
+        (Get-Content $staticSettingsPath -Raw) -replace '/INTERNAL_BUILD/', $version | Set-Content $staticSettingsPath -Encoding UTF8
+        Write-Host "Stamped version $version into StaticSettings.cs"
+      shell: pwsh
+
     - name: Build .NET application
       run: dotnet build "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-restore
 
