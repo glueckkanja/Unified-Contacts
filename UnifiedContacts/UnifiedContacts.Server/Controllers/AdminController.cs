@@ -368,6 +368,25 @@ namespace UnifiedContacts.Controllers
                     ContentType = "application/json"
                 };
             }
+            // Graph SDK errors (e.g. missing AppCatalog.ReadWrite.All consent) were previously uncaught, resulting in a blank 500
+            catch (Microsoft.Graph.Models.ODataErrors.ODataError e)
+            {
+                return new ContentResult()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Content = $"Manifest upload failed: {e.Error?.Code} - {e.Error?.Message}",
+                    ContentType = "text/plain"
+                };
+            }
+            catch (Microsoft.Kiota.Abstractions.ApiException e)
+            {
+                return new ContentResult()
+                {
+                    StatusCode = StatusCodes.Status500InternalServerError,
+                    Content = $"Manifest upload failed ({e.ResponseStatusCode}): {e.Message}",
+                    ContentType = "text/plain"
+                };
+            }
 
             if (manifestUpdateSuccessfull)
             {

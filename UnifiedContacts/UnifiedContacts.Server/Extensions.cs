@@ -2,6 +2,7 @@
 using Dapper.Contrib.Extensions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
@@ -225,6 +226,19 @@ COMMIT";
                         context.Response.ContentType = Text.Plain;
                         await context.Response.WriteAsync("Database not configured.");
                         return;
+                    }
+
+                    // Any other unhandled exception previously fell through here silently, producing an empty 500 body with no logging.
+                    if (exceptionHandlerPathFeature != null)
+                    {
+                        Microsoft.Extensions.Logging.ILogger logger = context.RequestServices
+                            .GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>()
+                            .CreateLogger("GlobalExceptionHandler");
+                        logger.LogError(exceptionHandlerPathFeature.Error, "Unhandled exception on {Path}", exceptionHandlerPathFeature.Path);
+
+                        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                        context.Response.ContentType = Text.Plain;
+                        await context.Response.WriteAsync("An unexpected error occurred. Please check the application logs.");
                     }
                 });
             });
