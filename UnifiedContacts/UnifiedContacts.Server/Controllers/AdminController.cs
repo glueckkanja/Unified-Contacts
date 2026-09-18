@@ -335,19 +335,13 @@ namespace UnifiedContacts.Controllers
                 return Ok(new GetManifestInfoResponse()
                 {
                     TeamsManifestExists = true,
-                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.MANIFEST_VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
+                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
                     TeamsManifestVersion = appDefinitions.Version,
                     ApiVersion = StaticSettings.VERSION
                 });
             }
 
-            // App exists but Graph has not populated the definition version yet (e.g. right after an upload)
-            return Ok(new GetManifestInfoResponse()
-            {
-                TeamsManifestExists = true,
-                TeamsManifestUpdatePossible = StaticSettings.VERSION != "/INTERNAL_BUILD/",
-                ApiVersion = StaticSettings.VERSION
-            });
+            return StatusCode(StatusCodes.Status500InternalServerError, "Version could not be acquired");
         }
 
         [HttpPost("manifest")]
@@ -362,7 +356,7 @@ namespace UnifiedContacts.Controllers
             bool manifestUpdateSuccessfull = false;
             try
             {
-                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.MANIFEST_VERSION);
+                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.VERSION);
             }
             catch (HttpResponseException e)
             {
