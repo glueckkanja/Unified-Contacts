@@ -13,6 +13,11 @@
         public const string VERSION = "/INTERNAL_BUILD/";
 
         /// <summary>
+        /// Edition of the UnifiedContactsEnvironment
+        /// </summary>
+        public const string EDITION = "Community Edition";
+
+        /// <summary>
         /// VERSION without tag prefix/suffix ('v6.0.1-dev-abc' -> '6.0.1'), as required by the Teams manifest schema
         /// </summary>
         public static string MANIFEST_VERSION { get; } = System.Text.RegularExpressions.Regex.Replace(VERSION.Split('-', '+')[0], "^[vV]\\.?", "");
