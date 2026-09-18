@@ -428,15 +428,53 @@ namespace UnifiedContacts.Controllers
         private async Task<VersionManifestDto> GetVersionManifest()
         {
             HttpClient client = _httpClientFactory.CreateClient("default");
-            HttpResponseMessage versionManifestRequest = await client.GetAsync(StaticSettings.VERSION_MANIFEST_URL);
-            string versionManifestJsonString = await versionManifestRequest.Content.ReadAsStringAsync();
-            VersionManifestDto? versionManifest = JsonSerializer.Deserialize<VersionManifestDto>(versionManifestJsonString, JsonSerializerOptionsDefaults.GetDefaultOptions());
+            using HttpRequestMessage request = new(HttpMethod.Get, StaticSettings.GITHUB_RELEASES_URL);
+            // GitHub API rejects requests without a user agent
+            request.Headers.UserAgent.ParseAdd("UnifiedContacts");
+            HttpResponseMessage versionManifestRequest = await client.SendAsync(request);
+            versionManifestRequest.EnsureSuccessStatusCode();
+            string releasesJsonString = await versionManifestRequest.Content.ReadAsStringAsync();
+            List<GitHubReleaseDto>? releases = JsonSerializer.Deserialize<List<GitHubReleaseDto>>(releasesJsonString, JsonSerializerOptionsDefaults.GetDefaultOptions());
 
-            if (versionManifest == null)
+            if (releases == null)
             {
-                throw new Exception("Version manifest could not be acquired");
+                throw new Exception("GitHub releases could not be acquired");
             }
-            return versionManifest;
+
+            static VersionManifestDtoChannel? ToChannel(GitHubReleaseDto? release, string name, bool isDefault)
+            {
+                string? binariesUrl = release?.Assets?.FirstOrDefault(asset => asset.Name == StaticSettings.RELEASE_BINARIES_ASSET_NAME)?.BrowserDownloadUrl;
+                if (release == null || binariesUrl == null)
+                {
+                    return null;
+                }
+                return new VersionManifestDtoChannel
+                {
+                    Default = isDefault,
+                    Name = name,
+                    LatestVersion = release.TagName,
+                    LatestVersionRef = binariesUrl
+                };
+            }
+
+            List<VersionManifestDtoChannel> channels = new();
+            VersionManifestDtoChannel? stable = ToChannel(releases.FirstOrDefault(release => !release.Draft && !release.Prerelease), "stable", true);
+            if (stable != null)
+            {
+                channels.Add(stable);
+            }
+            VersionManifestDtoChannel? prerelease = ToChannel(releases.FirstOrDefault(release => !release.Draft && release.Prerelease), "prerelease", false);
+            if (prerelease != null)
+            {
+                channels.Add(prerelease);
+            }
+
+            if (channels.Count == 0)
+            {
+                throw new Exception("No usable releases found on GitHub");
+            }
+
+            return new VersionManifestDto { Channels = channels };
         }
 
         /// <summary>
@@ -534,30 +572,25 @@ namespace UnifiedContacts.Controllers
                 }
 
                 Azure.Storage.Blobs.BlobClient blobClient = _blobServiceDto.Client.GetBlobContainerClient(StaticSettings.BLOB_STORAGE_CONTAINER_NAME).GetBlobClient(StaticSettings.BLOB_STORAGE_BLOB_NAME);
-                _ = blobClient.DeleteIfExistsAsync().ContinueWith(async (deleteTask) =>
+                // GitHub asset urls answer with a 302 redirect which Azure server-side copy cannot follow - stream the download instead
+                _ = Task.Run(async () =>
                 {
-                    if (deleteTask.IsCanceled || deleteTask.IsFaulted)
+                    try
+                    {
+                        HttpClient downloadClient = _httpClientFactory.CreateClient("default");
+                        using HttpRequestMessage downloadRequest = new(HttpMethod.Get, channelInfo.LatestVersionRef);
+                        downloadRequest.Headers.UserAgent.ParseAdd("UnifiedContacts");
+                        using HttpResponseMessage downloadResponse = await downloadClient.SendAsync(downloadRequest, HttpCompletionOption.ResponseHeadersRead);
+                        downloadResponse.EnsureSuccessStatusCode();
+                        using Stream assetStream = await downloadResponse.Content.ReadAsStreamAsync();
+                        await blobClient.UploadAsync(assetStream, overwrite: true);
+                        _updateStatusDto.RestartRequired = true;
+                        _updateStatusDto.IsUpdatePending = false;
+                    }
+                    catch (Exception)
                     {
                         _updateStatusDto.IsUpdatePending = false;
                         _updateStatusDto.RestartRequired = false;
-                    }
-                    else
-                    {
-                        Azure.Storage.Blobs.Models.CopyFromUriOperation copyInfo = await blobClient.StartCopyFromUriAsync(new Uri(channelInfo.LatestVersionRef));
-
-                        _ = copyInfo.WaitForCompletionAsync().AsTask().ContinueWith((copyTask) =>
-                        {
-                            if (copyTask.IsCanceled || copyTask.IsFaulted)
-                            {
-                                _updateStatusDto.IsUpdatePending = false;
-                                _updateStatusDto.RestartRequired = false;
-                            }
-                            else
-                            {
-                                _updateStatusDto.RestartRequired = true;
-                                _updateStatusDto.IsUpdatePending = false;
-                            }
-                        });
                     }
                 });
 
