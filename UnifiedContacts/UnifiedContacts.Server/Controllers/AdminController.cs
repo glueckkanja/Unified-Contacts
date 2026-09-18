@@ -335,7 +335,7 @@ namespace UnifiedContacts.Controllers
                 return Ok(new GetManifestInfoResponse()
                 {
                     TeamsManifestExists = true,
-                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
+                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.MANIFEST_VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
                     TeamsManifestVersion = appDefinitions.Version,
                     ApiVersion = StaticSettings.VERSION
                 });
@@ -356,7 +356,7 @@ namespace UnifiedContacts.Controllers
             bool manifestUpdateSuccessfull = false;
             try
             {
-                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.VERSION);
+                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.MANIFEST_VERSION);
             }
             catch (HttpResponseException e)
             {
@@ -425,7 +425,46 @@ namespace UnifiedContacts.Controllers
 
         #region Update
 
+        // Cache shields the admin page from GitHub's unauthenticated rate limit (60 requests/hour per ip)
+        private static VersionManifestDto? _cachedVersionManifest;
+        private static DateTime _cachedVersionManifestExpiry = DateTime.MinValue;
+        private static readonly SemaphoreSlim _versionManifestLock = new(1, 1);
+
         private async Task<VersionManifestDto> GetVersionManifest()
+        {
+            if (_cachedVersionManifest != null && DateTime.UtcNow < _cachedVersionManifestExpiry)
+            {
+                return _cachedVersionManifest;
+            }
+
+            await _versionManifestLock.WaitAsync();
+            try
+            {
+                if (_cachedVersionManifest != null && DateTime.UtcNow < _cachedVersionManifestExpiry)
+                {
+                    return _cachedVersionManifest;
+                }
+
+                try
+                {
+                    VersionManifestDto manifest = await FetchVersionManifestFromGitHub();
+                    _cachedVersionManifest = manifest;
+                    _cachedVersionManifestExpiry = DateTime.UtcNow.AddMinutes(5);
+                    return manifest;
+                }
+                catch when (_cachedVersionManifest != null)
+                {
+                    // Serve stale data instead of a 500 when GitHub is unavailable or rate-limited
+                    return _cachedVersionManifest;
+                }
+            }
+            finally
+            {
+                _versionManifestLock.Release();
+            }
+        }
+
+        private async Task<VersionManifestDto> FetchVersionManifestFromGitHub()
         {
             HttpClient client = _httpClientFactory.CreateClient("default");
             using HttpRequestMessage request = new(HttpMethod.Get, StaticSettings.GITHUB_RELEASES_URL);

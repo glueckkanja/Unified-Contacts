@@ -12,6 +12,11 @@
         /// </summary>
         public const string VERSION = "/INTERNAL_BUILD/";
 
+        /// <summary>
+        /// VERSION without tag prefix/suffix ('v6.0.1-dev-abc' -> '6.0.1'), as required by the Teams manifest schema
+        /// </summary>
+        public static string MANIFEST_VERSION { get; } = System.Text.RegularExpressions.Regex.Replace(VERSION.Split('-', '+')[0], "^[vV]\\.?", "");
+
         public const string BLOB_STORAGE_CONTAINER_NAME = "unified-contacts";
         public const string BLOB_STORAGE_BLOB_NAME = "binaries.zip";
         public const string ENTERPRISE_APP_MANIFEST_GUID = "67977205-6c56-489f-91c7-450c1569ed3b";
