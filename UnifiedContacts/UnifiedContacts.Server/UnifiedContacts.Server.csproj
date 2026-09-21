@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<SpaRoot>..\unifiedcontacts.client</SpaRoot>
@@ -92,11 +92,11 @@
 		<PackageReference Include="Dapper.Contrib" Version="2.0.78" />
 		<PackageReference Include="dbup" Version="5.0.41" />
 		<PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
-		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.10" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.12" />
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
 		<PackageReference Include="Microsoft.Graph" Version="5.91.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.4" />

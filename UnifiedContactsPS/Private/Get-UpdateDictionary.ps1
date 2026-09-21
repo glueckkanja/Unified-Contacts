@@ -24,6 +24,12 @@ function Get-UpdateDictionary {
             Dependencies = $null
             Parameters   = @($AppServiceName, $ResourceGroupName)
         }
+        'Update-DotNetVersionTo10'                     = [PSCustomObject]@{
+            Function     = ${function:Update-DotNetVersionTo10}
+            MinVersion   = "6.1.0"
+            Dependencies = $null
+            Parameters   = @($AppServiceName, $ResourceGroupName)
+        }
         'ApplicationPermissionEntraIdFilter'                      = [PSCustomObject]@{
             Function     = ${function:Add-ApplicationPermissionEntraIdFilter}
             MinVersion   = "5.6.6"
