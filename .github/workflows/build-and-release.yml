@@ -36,31 +36,36 @@ jobs:
       
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      with:
+        persist-credentials: false
       
     - name: Get version
       id: get-version
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        INPUT_VERSION: ${{ github.event.inputs.version }}
+        REF_NAME: ${{ github.ref_name }}
       run: |
-        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
-          $version = "${{ github.event.inputs.version }}"
+        if ("$env:EVENT_NAME" -eq "workflow_dispatch") {
+          $version = "$env:INPUT_VERSION"
         } else {
-          $version = "${{ github.ref_name }}"
+          $version = "$env:REF_NAME"
         }
         echo "version=$version" >> $env:GITHUB_OUTPUT
         Write-Host "Version: $version"
       shell: pwsh
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      # zizmor: ignore[cache-poisoning] - workflow runs only on tag push / workflow_dispatch (never on PRs) and npm caching is disabled
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: UnifiedContacts/unifiedcontacts.client/package-lock.json
 
     - name: Create lib directory for NuGet local source
       run: |
@@ -89,8 +94,10 @@ jobs:
       shell: pwsh
 
     - name: Stamp version into server and client
+      env:
+        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
       run: |
-        $version = "${{ steps.get-version.outputs.version }}"
+        $version = "$env:RELEASE_VERSION"
         foreach ($file in @("UnifiedContacts/UnifiedContacts.Server/Settings/StaticSettings.cs", "UnifiedContacts/unifiedcontacts.client/src/StaticSettings.ts")) {
           (Get-Content $file -Raw) -replace '/INTERNAL_BUILD/', $version | Set-Content $file -Encoding UTF8
           Write-Host "Stamped version $version into $file"
@@ -131,6 +138,9 @@ jobs:
       shell: pwsh
 
     - name: Create binaries package
+      env:
+        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
+        COMMIT_SHA: ${{ github.sha }}
       run: |
         # Create binaries directory
         New-Item -ItemType Directory -Force -Path "./binaries"
@@ -140,9 +150,9 @@ jobs:
         
         # Create version info file
         $versionInfo = @{
-          version = "${{ steps.get-version.outputs.version }}"
+          version = "$env:RELEASE_VERSION"
           buildDate = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-          commit = "${{ github.sha }}"
+          commit = "$env:COMMIT_SHA"
         }
         $versionInfo | ConvertTo-Json | Out-File -FilePath "./binaries/version.json" -Encoding UTF8
         
@@ -157,6 +167,10 @@ jobs:
 
     - name: Generate changelog
       id: changelog
+      env:
+        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
+        REPOSITORY: ${{ github.repository }}
+        DOTNET_VERSION: ${{ env.DOTNET_VERSION }}
       run: |
         # Try to get previous tag, if it fails, set a default message
         $prevTag = $null
@@ -164,7 +178,7 @@ jobs:
           # Get all tags, sort them, and get the second most recent (excluding current)
           $allTags = git tag --sort=-version:refname 2>$null
           if ($allTags -and $allTags.Count -gt 1) {
-            $currentTag = "${{ steps.get-version.outputs.version }}"
+            $currentTag = "$env:RELEASE_VERSION"
             $prevTag = ($allTags | Where-Object { $_ -ne $currentTag } | Select-Object -First 1)
           }
         }
@@ -173,10 +187,10 @@ jobs:
         }
         
         if ($prevTag) {
-          $compareLink = "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$prevTag...${{ steps.get-version.outputs.version }}"
+          $compareLink = "**Full Changelog**: https://github.com/$env:REPOSITORY/compare/$prevTag...$env:RELEASE_VERSION"
         }
         else {
-          $compareLink = "**Initial Release**: https://github.com/${{ github.repository }}/releases/tag/${{ steps.get-version.outputs.version }}"
+          $compareLink = "**Initial Release**: https://github.com/$env:REPOSITORY/releases/tag/$env:RELEASE_VERSION"
         }
         
         # Get current date for build info
@@ -189,11 +203,11 @@ jobs:
         $changelog += "- 🔧 PowerShell deployment module included`n"
         $changelog += "- ☁️ ARM templates for Azure deployment`n`n"
         $changelog += "### 🔧 Technical Details`n"
-        $changelog += "- 🏗️ Built with .NET ${{ env.DOTNET_VERSION }}`n"
+        $changelog += "- 🏗️ Built with .NET $env:DOTNET_VERSION`n"
         $changelog += "- ⚛️ React frontend included`n"
         $changelog += "- 📋 Self-contained deployment package`n`n"
         $changelog += "### 📋 Release Information`n"
-        $changelog += "- 🏷️ **Version**: ${{ steps.get-version.outputs.version }}`n"
+        $changelog += "- 🏷️ **Version**: $env:RELEASE_VERSION`n"
         $changelog += "- 📅 **Build Date**: $buildDate`n"
         $changelog += "- 🔗 $compareLink`n`n"
         $changelog += "---`n"
@@ -207,7 +221,8 @@ jobs:
 
     - name: Create Release
       id: create-release
-      uses: softprops/action-gh-release@v1
+      # zizmor: ignore[superfluous-actions] - pinned gh-release action is intentionally used over gh CLI for its file-glob upload handling
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
         tag_name: ${{ steps.get-version.outputs.version }}
         name: UnifiedContacts ${{ steps.get-version.outputs.version }}
@@ -221,7 +236,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: unified-contacts-${{ steps.get-version.outputs.version }}
         path: |

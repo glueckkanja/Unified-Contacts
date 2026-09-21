@@ -27,9 +27,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         fetch-depth: 0
+        persist-credentials: false
 
     - name: Generate version
       id: version
@@ -57,16 +58,15 @@ jobs:
       shell: pwsh
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      # zizmor: ignore[cache-poisoning] - workflow runs only on develop push / workflow_dispatch (never on PRs) and npm caching is disabled
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: UnifiedContacts/unifiedcontacts.client/package-lock.json
 
     - name: Create lib directory for NuGet local source
       run: |
@@ -95,8 +95,10 @@ jobs:
       shell: pwsh
 
     - name: Stamp version into server and client
+      env:
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
       run: |
-        $version = "${{ steps.version.outputs.version }}"
+        $version = "$env:RELEASE_VERSION"
         foreach ($file in @("UnifiedContacts/UnifiedContacts.Server/Settings/StaticSettings.cs", "UnifiedContacts/unifiedcontacts.client/src/StaticSettings.ts")) {
           (Get-Content $file -Raw) -replace '/INTERNAL_BUILD/', $version | Set-Content $file -Encoding UTF8
           Write-Host "Stamped version $version into $file"
@@ -120,6 +122,9 @@ jobs:
       run: dotnet publish "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --output ./publish
 
     - name: Create prerelease package
+      env:
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        COMMIT_SHA: ${{ github.sha }}
       run: |
         # Create binaries directory
         New-Item -ItemType Directory -Force -Path "./binaries"
@@ -127,9 +132,9 @@ jobs:
         
         # Create version info
         $versionInfo = @{
-          version = "${{ steps.version.outputs.version }}"
+          version = "$env:RELEASE_VERSION"
           buildDate = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
-          commit = "${{ github.sha }}"
+          commit = "$env:COMMIT_SHA"
           branch = "develop"
           prerelease = $true
         }
@@ -152,7 +157,8 @@ jobs:
 
     - name: Create prerelease
       id: create_prerelease
-      uses: softprops/action-gh-release@v1
+      # zizmor: ignore[superfluous-actions] - pinned gh-release action is intentionally used over gh CLI for its file-glob upload handling
+      uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
       with:
         tag_name: ${{ steps.version.outputs.version }}
         name: UnifiedContacts ${{ steps.version.outputs.version }} (Prerelease)
