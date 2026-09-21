@@ -85,18 +85,18 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.4.0" />
-		<PackageReference Include="Azure.Identity" Version="1.15.0" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.25.0" />
-		<PackageReference Include="Dapper" Version="2.1.66" />
+		<PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
+		<PackageReference Include="Azure.Identity" Version="1.21.0" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
+		<PackageReference Include="Dapper" Version="2.1.86" />
 		<PackageReference Include="Dapper.Contrib" Version="2.0.78" />
 		<PackageReference Include="dbup" Version="5.0.41" />
 		<PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.23.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.19" />
-		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.10" />
-		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
-		<PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.31" />
+		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="8.0.31" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
 		<PackageReference Include="Microsoft.Graph" Version="5.91.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.4" />
