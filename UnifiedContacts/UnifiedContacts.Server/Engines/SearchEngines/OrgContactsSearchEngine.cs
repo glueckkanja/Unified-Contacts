@@ -7,6 +7,7 @@ using UnifiedContacts.Interfaces;
 using UnifiedContacts.Models;
 using UnifiedContacts.Models.Dto;
 using UnifiedContacts.Settings;
+using UnifiedContacts.Statics;
 
 namespace UnifiedContacts.Engines.SearchEngines
 {
@@ -16,7 +17,7 @@ namespace UnifiedContacts.Engines.SearchEngines
         private readonly AuthSettings _authSettings;
 
         private const string SEARCH_QUERY_PLACEHOLDER = "{{{SEARCH_QUERY_PLACEHOLDER}}}";
-        private const string ORG_CONTACTS_GRAPH_FILTER_TEMPLATE = $"startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(mail, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}')";
+        private const string ORG_CONTACTS_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(mail, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}'))";
 
         public OrgContactsSearchEngine(IGraphApiEngine graphApiEngine, AuthSettings authSettings)
         {
@@ -106,7 +107,7 @@ namespace UnifiedContacts.Engines.SearchEngines
                 //TODO readd the select as soon Graph API fixed the phones select (Phones are not returned even if selected)
                 orgContacts = await graphClient.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = ORG_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery);
+                    requestConfiguration.QueryParameters.Filter = ODataFilterHelper.BuildTokenizedFilter(ORG_CONTACTS_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery);
                     requestConfiguration.QueryParameters.Count = true;
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "mail", "addresses", "companyName", "phones", "imAddresses", "jobTitle", "department" };
