@@ -97,7 +97,7 @@
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
 		<PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.12" />
-		<PackageReference Include="Microsoft.Graph" Version="5.91.0" />
+		<PackageReference Include="Microsoft.Graph" Version="6.7.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="9.0.4" />
