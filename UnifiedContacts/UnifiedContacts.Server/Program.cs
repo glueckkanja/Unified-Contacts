@@ -3,7 +3,9 @@ using Azure.Storage.Blobs;
 using DbUp;
 using DbUp.Engine;
 using DbUp.Support;
+using Microsoft.ApplicationInsights;
 using Microsoft.ApplicationInsights.AspNetCore.Extensions;
+using Microsoft.ApplicationInsights.Extensibility;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Primitives;
@@ -345,9 +347,18 @@ builder.Services.AddSingleton<FavoritesRepository>();
 builder.Services.AddSingleton<DatabaseContactsRepository>();
 builder.Services.AddTransient<TelemetryRepository>();
 
-ApplicationInsightsServiceOptions aiOptions = new ApplicationInsightsServiceOptions();
-aiOptions.ConnectionString = builder.Configuration.GetConnectionString("ApplicationInsights");
-builder.Services.AddApplicationInsightsTelemetry(aiOptions); // This already injects the TelemetryClient
+string? aiConnectionString = builder.Configuration.GetConnectionString("ApplicationInsights");
+if (!string.IsNullOrWhiteSpace(aiConnectionString))
+{
+    ApplicationInsightsServiceOptions aiOptions = new ApplicationInsightsServiceOptions();
+    aiOptions.ConnectionString = aiConnectionString;
+    builder.Services.AddApplicationInsightsTelemetry(aiOptions); // This already injects the TelemetryClient
+}
+else
+{
+    // v3's OpenTelemetry-based exporter throws at startup without a connection string; register a disabled client instead so DI still resolves
+    builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration { DisableTelemetry = true }));
+}
 builder.Services.AddHttpClient("default");
 
 builder.Services.AddControllers().AddJsonOptions(options =>
