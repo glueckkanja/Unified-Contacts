@@ -9,7 +9,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Primitives;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Net.Http.Headers;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.IdentityModel.Tokens.Jwt;
 using System.Reflection;
 using System.Text.Json;
