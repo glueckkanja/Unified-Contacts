@@ -15,7 +15,7 @@ permissions:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  NODE_VERSION: '20.x'
+  NODE_VERSION: '26.x'
   CONFIGURATION: Release
   WORKING_DIRECTORY: UnifiedContacts/UnifiedContacts.Server
   CI: false
