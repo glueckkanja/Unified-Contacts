@@ -73,7 +73,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 users = await graphClient.Users.GetAsync((requestConfiguration) =>
                 {
-                    string tokenizedFilter = ODataFilterHelper.BuildTokenizedFilter(AZURE_AD_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery);
+                    string tokenizedFilter = ODataFilterHelper.BuildTokenizedFilter(AZURE_AD_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery, entraIdFilterString.ToString());
                     requestConfiguration.QueryParameters.Filter = $"({tokenizedFilter}){entraIdFilterString}";
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "imAddresses", "displayName", "mobilePhone", "businessPhones", "companyName", "jobTitle", "department", "streetAddress", "postalCode", "city", "country", "mail", "otherMails" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
