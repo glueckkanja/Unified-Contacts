@@ -106,7 +106,7 @@ namespace UnifiedContacts.Engines.SearchEngines
                 //TODO readd the select as soon Graph API fixed the phones select (Phones are not returned even if selected)
                 orgContacts = await graphClient.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = ORG_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery);
+                    requestConfiguration.QueryParameters.Filter = ORG_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery.Replace("'", "''"));
                     requestConfiguration.QueryParameters.Count = true;
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "mail", "addresses", "companyName", "phones", "imAddresses", "jobTitle", "department" };
