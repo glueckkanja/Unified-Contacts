@@ -73,7 +73,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 users = await graphClient.Users.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = AZURE_AD_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery).Replace(ENTRA_ID_FILTER, entraIdFilterString.ToString());
+                    requestConfiguration.QueryParameters.Filter = AZURE_AD_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery.Replace("'", "''")).Replace(ENTRA_ID_FILTER, entraIdFilterString.ToString());
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "imAddresses", "displayName", "mobilePhone", "businessPhones", "companyName", "jobTitle", "department", "streetAddress", "postalCode", "city", "country", "mail", "otherMails" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;

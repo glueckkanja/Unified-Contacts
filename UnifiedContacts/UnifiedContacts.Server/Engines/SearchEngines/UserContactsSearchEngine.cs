@@ -17,6 +17,10 @@ namespace UnifiedContacts.Engines.SearchEngines
         private const string SEARCH_QUERY_PLACEHOLDER = "{{{SEARCH_QUERY_PLACEHOLDER}}}";
         private const string USER_CONTACTS_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or emailAddresses/any(a:a/address eq '{SEARCH_QUERY_PLACEHOLDER}'))";
 
+        // Bounds the tokenized filter so a long query can't exceed Graph's URL/filter limits; extra terms are still enforced client-side.
+        private const int MAX_TOKENIZED_TERMS = 3;
+        private const int MAX_TERM_LENGTH = 64;
+
         public UserContactsSearchEngine(IGraphApiEngine graphApiEngine, AuthSettings authSettings)
         {
             _graphApiEngine = graphApiEngine;
@@ -32,7 +36,11 @@ namespace UnifiedContacts.Engines.SearchEngines
                 terms = new[] { searchQuery };
             }
 
-            return string.Join(" and ", terms.Select(term => USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, term.Replace("'", "''"))));
+            return string.Join(" and ", terms.Take(MAX_TOKENIZED_TERMS).Select(term =>
+            {
+                string clampedTerm = term.Length > MAX_TERM_LENGTH ? term.Substring(0, MAX_TERM_LENGTH) : term;
+                return USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, clampedTerm.Replace("'", "''"));
+            }));
         }
 
         private List<SearchEngineResultDto> ConvertToSearchEnginerResults(IEnumerable<Contact> contacts)
