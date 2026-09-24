@@ -102,7 +102,7 @@ namespace UnifiedContacts.Controllers
 
         private static IEnumerable<SearchEngineResultDto> GetResultsWithContainingSearchQuery(IEnumerable<SearchEngineResultDto> listToFilter, string searchQuery)
         {
-            string[] terms = searchQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            string[] terms = searchQuery.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (terms.Length == 0)
             {
                 terms = new[] { searchQuery };
