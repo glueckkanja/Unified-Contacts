@@ -111,7 +111,7 @@ namespace UnifiedContacts.Controllers
             return listToFilter.Where((result) =>
             {
                 List<string> allStringValues = GetAllStringValues(result).ToList();
-                // Every term must match somewhere (not necessarily the same field), so "Magda Lena" also matches givenName="Magda" + surname="Lena"
+                // Every term must match somewhere (not necessarily the same field), so "John Doe" also matches givenName="John" + surname="Doe"
                 return terms.All(term => allStringValues.Any(str => str.Contains(term, StringComparison.OrdinalIgnoreCase)));
             });
         }
