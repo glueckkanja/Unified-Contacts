@@ -16,7 +16,7 @@ namespace UnifiedContacts.Engines.SearchEngines
         private readonly AuthSettings _authSettings;
 
         private const string SEARCH_QUERY_PLACEHOLDER = "{{{SEARCH_QUERY_PLACEHOLDER}}}";
-        private const string USER_CONTACTS_GRAPH_FILTER_TEMPLATE = $"startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or emailAddresses/any(a:a/address eq '{SEARCH_QUERY_PLACEHOLDER}')";
+        private const string USER_CONTACTS_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or emailAddresses/any(a:a/address eq '{SEARCH_QUERY_PLACEHOLDER}'))";
 
         public UserContactsSearchEngine(IGraphApiEngine graphApiEngine, AuthSettings authSettings)
         {
@@ -83,7 +83,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 contacts = await graphClient.Me.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, ODataFilterHelper.EscapeODataStringLiteral(searchQuery));
+                    requestConfiguration.QueryParameters.Filter = ODataFilterHelper.BuildTokenizedFilter(USER_CONTACTS_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery);
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "imAddresses", "mobilePhone", "businessPhones", "companyName", "department", "jobTitle", "businessAddress", "homeAddress", "otherAddress", "emailAddresses", "homePhones", "givenName", "surName", "middleName", "nickName" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
