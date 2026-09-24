@@ -15,32 +15,12 @@ namespace UnifiedContacts.Engines.SearchEngines
         private readonly AuthSettings _authSettings;
 
         private const string SEARCH_QUERY_PLACEHOLDER = "{{{SEARCH_QUERY_PLACEHOLDER}}}";
-        private const string USER_CONTACTS_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or emailAddresses/any(a:a/address eq '{SEARCH_QUERY_PLACEHOLDER}'))";
-
-        // Bounds the tokenized filter so a long query can't exceed Graph's URL/filter limits; extra terms are still enforced client-side.
-        private const int MAX_TOKENIZED_TERMS = 3;
-        private const int MAX_TERM_LENGTH = 64;
+        private const string USER_CONTACTS_GRAPH_FILTER_TEMPLATE = $"startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or emailAddresses/any(a:a/address eq '{SEARCH_QUERY_PLACEHOLDER}')";
 
         public UserContactsSearchEngine(IGraphApiEngine graphApiEngine, AuthSettings authSettings)
         {
             _graphApiEngine = graphApiEngine;
             _authSettings = authSettings;
-        }
-
-        // ANDs one field-group per whitespace term so "John Doe" also matches a contact filed as givenName "John" + surname "Doe".
-        private static string BuildTokenizedFilter(string searchQuery)
-        {
-            string[] terms = searchQuery.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (terms.Length == 0)
-            {
-                terms = new[] { searchQuery };
-            }
-
-            return string.Join(" and ", terms.Take(MAX_TOKENIZED_TERMS).Select(term =>
-            {
-                string clampedTerm = term.Length > MAX_TERM_LENGTH ? term.Substring(0, MAX_TERM_LENGTH) : term;
-                return USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, clampedTerm.Replace("'", "''"));
-            }));
         }
 
         private List<SearchEngineResultDto> ConvertToSearchEnginerResults(IEnumerable<Contact> contacts)
@@ -102,7 +82,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 contacts = await graphClient.Me.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = BuildTokenizedFilter(searchQuery);
+                    requestConfiguration.QueryParameters.Filter = USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery.Replace("'", "''"));
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "imAddresses", "mobilePhone", "businessPhones", "companyName", "department", "jobTitle", "businessAddress", "homeAddress", "otherAddress", "emailAddresses", "homePhones", "givenName", "surName", "middleName", "nickName" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
