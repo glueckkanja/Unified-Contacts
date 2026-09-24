@@ -137,6 +137,11 @@ namespace UnifiedContacts.Engines.SearchEngines
                         {
                             throw new UnauthorizedAccessException("Forbidden");
                         }
+                        // Favorited user was deleted; skip it instead of failing the whole favorites request.
+                        else if (e.ResponseStatusCode == StatusCodes.Status404NotFound)
+                        {
+                            continue;
+                        }
                         else
                         {
                             throw;

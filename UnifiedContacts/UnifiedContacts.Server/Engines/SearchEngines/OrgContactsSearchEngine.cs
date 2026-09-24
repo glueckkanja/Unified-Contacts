@@ -152,8 +152,16 @@ namespace UnifiedContacts.Engines.SearchEngines
                 BatchResponseContentCollection batchResponseContent = await graphClient.Batch.PostAsync(batchRequestContent);
                 foreach (string step in stepIds)
                 {
-                    OrgContact orgContact = await batchResponseContent.GetResponseByIdAsync<OrgContact>(step);
-                    orgContactsItemBatchResponses.Add(step, orgContact);
+                    try
+                    {
+                        OrgContact orgContact = await batchResponseContent.GetResponseByIdAsync<OrgContact>(step);
+                        orgContactsItemBatchResponses.Add(step, orgContact);
+                    }
+                    // Favorited org contact was deleted; skip it instead of failing the whole favorites request.
+                    catch (ApiException e) when (e.ResponseStatusCode == StatusCodes.Status404NotFound)
+                    {
+                        continue;
+                    }
                 }
             }
             catch (ApiException e)
