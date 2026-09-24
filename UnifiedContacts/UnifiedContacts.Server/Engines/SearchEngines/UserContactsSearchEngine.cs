@@ -136,10 +136,18 @@ namespace UnifiedContacts.Engines.SearchEngines
                 BatchResponseContentCollection batchResponseContent = await graphClient.Batch.PostAsync(batchRequestContent);
                 foreach (string step in stepIds)
                 {
-                    Contact contact = await batchResponseContent.GetResponseByIdAsync<Contact>(step);
-                    if (contact != null)
+                    try
                     {
-                        userContactsItemBatchResponses.Add(step, contact);
+                        Contact contact = await batchResponseContent.GetResponseByIdAsync<Contact>(step);
+                        if (contact != null)
+                        {
+                            userContactsItemBatchResponses.Add(step, contact);
+                        }
+                    }
+                    // Favorited contact was deleted; skip it instead of failing the whole favorites request.
+                    catch (ApiException e) when (e.ResponseStatusCode == (int)System.Net.HttpStatusCode.NotFound)
+                    {
+                        continue;
                     }
                 }
             }
