@@ -34,7 +34,7 @@ namespace UnifiedContacts.Statics
         /// </summary>
         public static string BuildTokenizedFilter(string filterTemplate, string placeholder, string searchQuery, string appendedFilter = "")
         {
-            string[] terms = searchQuery.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            string[] terms = searchQuery.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (terms.Length == 0)
             {
                 terms = new[] { searchQuery };
