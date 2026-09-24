@@ -6,7 +6,6 @@ using UnifiedContacts.Interfaces;
 using UnifiedContacts.Models;
 using UnifiedContacts.Models.Dto;
 using UnifiedContacts.Settings;
-using UnifiedContacts.Statics;
 
 namespace UnifiedContacts.Engines.SearchEngines
 {
@@ -22,6 +21,18 @@ namespace UnifiedContacts.Engines.SearchEngines
         {
             _graphApiEngine = graphApiEngine;
             _authSettings = authSettings;
+        }
+
+        // ANDs one field-group per whitespace term so "John Doe" also matches a contact filed as givenName "John" + surname "Doe".
+        private static string BuildTokenizedFilter(string searchQuery)
+        {
+            string[] terms = searchQuery.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (terms.Length == 0)
+            {
+                terms = new[] { searchQuery };
+            }
+
+            return string.Join(" and ", terms.Select(term => USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, term.Replace("'", "''"))));
         }
 
         private List<SearchEngineResultDto> ConvertToSearchEnginerResults(IEnumerable<Contact> contacts)
@@ -83,7 +94,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 contacts = await graphClient.Me.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = ODataFilterHelper.BuildTokenizedFilter(USER_CONTACTS_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery);
+                    requestConfiguration.QueryParameters.Filter = BuildTokenizedFilter(searchQuery);
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "imAddresses", "mobilePhone", "businessPhones", "companyName", "department", "jobTitle", "businessAddress", "homeAddress", "otherAddress", "emailAddresses", "homePhones", "givenName", "surName", "middleName", "nickName" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;

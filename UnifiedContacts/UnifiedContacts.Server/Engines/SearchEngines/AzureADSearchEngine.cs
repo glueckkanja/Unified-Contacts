@@ -7,7 +7,6 @@ using UnifiedContacts.Interfaces;
 using UnifiedContacts.Models;
 using UnifiedContacts.Models.Dto;
 using UnifiedContacts.Settings;
-using UnifiedContacts.Statics;
 
 namespace UnifiedContacts.Engines.SearchEngines
 {
@@ -18,7 +17,8 @@ namespace UnifiedContacts.Engines.SearchEngines
         private readonly RuntimeInfoDto _runtimeInfo;
 
         private const string SEARCH_QUERY_PLACEHOLDER = "{{{SEARCH_QUERY_PLACEHOLDER}}}";
-        private const string AZURE_AD_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(city, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(userPrincipalName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(mail, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or otherMails/any(a:startswith(a, '{SEARCH_QUERY_PLACEHOLDER}')))";
+        private const string ENTRA_ID_FILTER = "{{{ENTRA_ID_FILTER}}}";
+        private const string AZURE_AD_GRAPH_FILTER_TEMPLATE = $"(startswith(displayName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(givenName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(surname, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(city, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(department, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(jobTitle, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(userPrincipalName, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(mail, '{SEARCH_QUERY_PLACEHOLDER}') or startswith(companyName, '{SEARCH_QUERY_PLACEHOLDER}') or otherMails/any(a:startswith(a, '{SEARCH_QUERY_PLACEHOLDER}'))) {ENTRA_ID_FILTER}";
 
         public AzureADSearchEngine(IGraphApiEngine graphApiEngine, AuthSettings authSettings, RuntimeInfoDto startupInfo)
         {
@@ -73,8 +73,7 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 users = await graphClient.Users.GetAsync((requestConfiguration) =>
                 {
-                    string tokenizedFilter = ODataFilterHelper.BuildTokenizedFilter(AZURE_AD_GRAPH_FILTER_TEMPLATE, SEARCH_QUERY_PLACEHOLDER, searchQuery, entraIdFilterString.ToString());
-                    requestConfiguration.QueryParameters.Filter = $"({tokenizedFilter}){entraIdFilterString}";
+                    requestConfiguration.QueryParameters.Filter = AZURE_AD_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery).Replace(ENTRA_ID_FILTER, entraIdFilterString.ToString());
                     requestConfiguration.QueryParameters.Select = new string[] { "id", "imAddresses", "displayName", "mobilePhone", "businessPhones", "companyName", "jobTitle", "department", "streetAddress", "postalCode", "city", "country", "mail", "otherMails" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
