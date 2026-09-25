@@ -21,7 +21,6 @@ env:
   NODE_VERSION: '26.x'
   CONFIGURATION: Release
   WORKING_DIRECTORY: UnifiedContacts/UnifiedContacts.Server
-  CI: false
 
 jobs:
   generate_version:
@@ -149,12 +148,7 @@ jobs:
         COMMIT_SHA: ${{ github.sha }}
       shell: pwsh
       run: |
-        # Create binaries directory
-        New-Item -ItemType Directory -Force -Path "./binaries"
         New-Item -ItemType Directory -Force -Path "./release_assets"
-        
-        # Copy published application
-        Copy-Item -Path "./publish/*" -Destination "./binaries/" -Recurse -Force
         
         # Create version info file
         $versionInfo = @{
@@ -162,10 +156,10 @@ jobs:
           buildDate = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
           commit = "$env:COMMIT_SHA"
         }
-        $versionInfo | ConvertTo-Json | Out-File -FilePath "./binaries/version.json" -Encoding UTF8
+        $versionInfo | ConvertTo-Json | Out-File -FilePath "./publish/version.json" -Encoding UTF8
         
         # Create zip file
-        Compress-Archive -Path "./binaries/*" -DestinationPath "./release_assets/binaries.zip" -Force
+        Compress-Archive -Path "./publish/*" -DestinationPath "./release_assets/binaries.zip" -Force
 
     - name: Create PowerShell module package
       shell: pwsh
