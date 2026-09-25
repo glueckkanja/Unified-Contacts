@@ -48,6 +48,8 @@ jobs:
   build:
     name: Build Unified Contacts
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     needs:
       - generate_version
     steps:
