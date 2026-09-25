@@ -3,8 +3,9 @@ run-name: Build and Release Unified Contacts
 
 # Mapping:
 #   Push to main                -> Creates tag and prerelease including binaries - Set to release manually.
-#   Dispatch on main            -> Skip execution completely.
-#   Dispatch on other branches  -> Creates a binary build only.
+#   Dispatch on main            -> Skip execution completely to avoid multiple releases on the same main branch commit.
+#   Dispatch on other branches  -> Creates a tag and draft release including binaries.
+#   Pull request targeting main -> Creates a tag and draft release including binaries.
 
 concurrency:
   group: "Create Unified Contacts Release"
@@ -13,6 +14,9 @@ concurrency:
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "main"
+  pull_request:
     branches:
       - "main"
 
@@ -25,8 +29,7 @@ env:
 jobs:
   generate_version:
     name: Generate version and draft release
-    # Manual dispatches on main branch will be skipped to avoid creating a release for the same commit twice
-    if: ${{ github.event_name != 'workflow_dispatch' || github.ref_name != 'main' }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref_name == 'main') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # Creates the version tag and the draft release
@@ -41,11 +44,12 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           is_prerelease: true
           is_draft_release: true
-          suppress_release: ${{ !(github.event_name == 'push' && github.ref_name == 'main') }}
 
   build:
     name: Build Unified Contacts
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # allows uploading assets and publishing releases
     needs:
       - generate_version
     steps:
@@ -60,7 +64,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Node.js
-      # zizmor: ignore[cache-poisoning] - workflow runs only on main push / workflow_dispatch (never on PRs) and npm caching is disabled
+      # zizmor: ignore[cache-poisoning] - npm caching is disabled
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ env.NODE_VERSION }}
@@ -172,7 +176,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         release_id: ${{ needs.generate_version.outputs.release_id }}
         asset_path: "release_assets"
-        publish_draft_release: "true" # -> condition
+        publish_draft_release: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -183,5 +187,3 @@ jobs:
           ./release_assets/UnifiedContactsPS.zip
           ./publish/
         retention-days: 30
-
-
