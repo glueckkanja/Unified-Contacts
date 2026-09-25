@@ -1,60 +1,62 @@
-name: Build and Release
+name: Build and Release Unified Contacts
+run-name: Build and Release Unified Contacts
+
+# Mapping:
+#   Push to main                -> Creates tag and prerelease including binaries - Set to release manually.
+#   Dispatch on main            -> Skip execution completely to avoid multiple releases on the same main branch commit.
+#   Dispatch on other branches  -> Creates a tag and draft release including binaries.
+#   Pull request targeting main -> Creates a tag and draft release including binaries.
+
+concurrency:
+  group: "Create Unified Contacts Release"
+  cancel-in-progress: false
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (e.g., v1.0.0)'
-        required: true
-        default: 'v1.0.0'
-      prerelease:
-        description: 'Mark as prerelease'
-        type: boolean
-        default: false
-
-permissions:
-  contents: write
-  packages: write
-  actions: read
+  push:
+    branches:
+      - "main"
+  pull_request:
+    branches:
+      - "main"
 
 env:
   DOTNET_VERSION: '10.0.x'
   NODE_VERSION: '26.x'
   CONFIGURATION: Release
   WORKING_DIRECTORY: UnifiedContacts/UnifiedContacts.Server
-  CI: false
 
 jobs:
-  build:
-    runs-on: windows-latest
-    
+  generate_version:
+    name: Generate version and draft release
+    if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref_name == 'main') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Creates the version tag and the draft release
     outputs:
-      version: ${{ steps.get-version.outputs.version }}
-      
+      tag: ${{ steps.generate_version.outputs.tag }}
+      release_id: ${{ steps.generate_version.outputs.release_id }}
     steps:
-    - name: Checkout code
+      - name: Generate version and draft release
+        id: generate_version
+        uses: glueckkanja/action-epoch-semantic-version@f1eb38a96b44a2a9ce4378257afceed2babcc6e1 # v2.1.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          is_prerelease: true
+          is_draft_release: true
+
+  build:
+    name: Build Unified Contacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # allows uploading assets and publishing releases
+    needs:
+      - generate_version
+    steps:
+    - name: Checkout Repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-      
-    - name: Get version
-      id: get-version
-      env:
-        EVENT_NAME: ${{ github.event_name }}
-        INPUT_VERSION: ${{ github.event.inputs.version }}
-        REF_NAME: ${{ github.ref_name }}
-      run: |
-        if ("$env:EVENT_NAME" -eq "workflow_dispatch") {
-          $version = "$env:INPUT_VERSION"
-        } else {
-          $version = "$env:REF_NAME"
-        }
-        echo "version=$version" >> $env:GITHUB_OUTPUT
-        Write-Host "Version: $version"
-      shell: pwsh
 
     - name: Setup .NET
       uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -62,18 +64,19 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Node.js
-      # zizmor: ignore[cache-poisoning] - workflow runs only on tag push / workflow_dispatch (never on PRs) and npm caching is disabled
+      # zizmor: ignore[cache-poisoning] - npm caching is disabled
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ env.NODE_VERSION }}
 
     - name: Create lib directory for NuGet local source
+      shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path "${{ env.WORKING_DIRECTORY }}/lib"
         Write-Host "Created lib directory for NuGet local source"
-      shell: pwsh
         
     - name: Restore .NET dependencies
+      shell: pwsh
       run: |
         # Create a custom NuGet.Config that only uses nuget.org
         $nugetConfig = @"
@@ -91,40 +94,47 @@ jobs:
         
         # Use the custom config for restore
         dotnet restore "${{ env.WORKING_DIRECTORY }}" --configfile "./nuget.config"
-      shell: pwsh
 
     - name: Stamp version into server and client
+      shell: pwsh
       env:
-        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
+        RELEASE_VERSION: ${{ needs.generate_version.outputs.tag }}
       run: |
         $version = "$env:RELEASE_VERSION"
         foreach ($file in @("UnifiedContacts/UnifiedContacts.Server/Settings/StaticSettings.cs", "UnifiedContacts/unifiedcontacts.client/src/StaticSettings.ts")) {
           (Get-Content $file -Raw) -replace '/INTERNAL_BUILD/', $version | Set-Content $file -Encoding UTF8
           Write-Host "Stamped version $version into $file"
         }
-      shell: pwsh
 
     - name: Install Node.js dependencies
+      shell: pwsh
       run: |
         cd UnifiedContacts/unifiedcontacts.client
         npm ci
 
     - name: Build React client
+      shell: pwsh
       run: |
         cd UnifiedContacts/unifiedcontacts.client
         npm run build
 
     - name: Build .NET application
-      run: dotnet build "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-restore
+      shell: pwsh
+      run: |
+        dotnet build "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-restore
 
     - name: Test .NET application
+      shell: pwsh
       run: |
         dotnet test "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
 
     - name: Publish .NET application
-      run: dotnet publish "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --output ./publish
+      shell: pwsh
+      run: |
+        dotnet publish "${{ env.WORKING_DIRECTORY }}" --configuration ${{ env.CONFIGURATION }} --no-build --output ./publish
 
     - name: Create PowerShell module structure
+      shell: pwsh
       run: |
         # Create module directory structure
         New-Item -ItemType Directory -Force -Path "./publish-module/UnifiedContactsPS"
@@ -135,18 +145,14 @@ jobs:
         # Copy ARM templates
         New-Item -ItemType Directory -Force -Path "./publish-module/arm-templates"
         Copy-Item -Path "arm-templates/*" -Destination "./publish-module/arm-templates/" -Recurse -Force
-      shell: pwsh
 
     - name: Create binaries package
       env:
-        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
+        RELEASE_VERSION: ${{ needs.generate_version.outputs.tag }}
         COMMIT_SHA: ${{ github.sha }}
+      shell: pwsh
       run: |
-        # Create binaries directory
-        New-Item -ItemType Directory -Force -Path "./binaries"
-        
-        # Copy published application
-        Copy-Item -Path "./publish/*" -Destination "./binaries/" -Recurse -Force
+        New-Item -ItemType Directory -Force -Path "./release_assets"
         
         # Create version info file
         $versionInfo = @{
@@ -154,95 +160,30 @@ jobs:
           buildDate = (Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC")
           commit = "$env:COMMIT_SHA"
         }
-        $versionInfo | ConvertTo-Json | Out-File -FilePath "./binaries/version.json" -Encoding UTF8
+        $versionInfo | ConvertTo-Json | Out-File -FilePath "./publish/version.json" -Encoding UTF8
         
         # Create zip file
-        Compress-Archive -Path "./binaries/*" -DestinationPath "./binaries.zip" -Force
-      shell: pwsh
+        Compress-Archive -Path "./publish/*" -DestinationPath "./release_assets/binaries.zip" -Force
 
     - name: Create PowerShell module package
-      run: |
-        Compress-Archive -Path "./publish-module/*" -DestinationPath "./UnifiedContactsPS.zip" -Force
       shell: pwsh
-
-    - name: Generate changelog
-      id: changelog
-      env:
-        RELEASE_VERSION: ${{ steps.get-version.outputs.version }}
-        REPOSITORY: ${{ github.repository }}
-        DOTNET_VERSION: ${{ env.DOTNET_VERSION }}
       run: |
-        # Try to get previous tag, if it fails, set a default message
-        $prevTag = $null
-        try {
-          # Get all tags, sort them, and get the second most recent (excluding current)
-          $allTags = git tag --sort=-version:refname 2>$null
-          if ($allTags -and $allTags.Count -gt 1) {
-            $currentTag = "$env:RELEASE_VERSION"
-            $prevTag = ($allTags | Where-Object { $_ -ne $currentTag } | Select-Object -First 1)
-          }
-        }
-        catch {
-          # If git command fails, $prevTag remains $null
-        }
-        
-        if ($prevTag) {
-          $compareLink = "**Full Changelog**: https://github.com/$env:REPOSITORY/compare/$prevTag...$env:RELEASE_VERSION"
-        }
-        else {
-          $compareLink = "**Initial Release**: https://github.com/$env:REPOSITORY/releases/tag/$env:RELEASE_VERSION"
-        }
-        
-        # Get current date for build info
-        $buildDate = Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC"
-        
-        # Create a properly formatted changelog
-        $changelog = "## 🚀 What's Changed`n`n"
-        $changelog += "### ✨ Features`n"
-        $changelog += "- 📦 Updated application binaries`n"
-        $changelog += "- 🔧 PowerShell deployment module included`n"
-        $changelog += "- ☁️ ARM templates for Azure deployment`n`n"
-        $changelog += "### 🔧 Technical Details`n"
-        $changelog += "- 🏗️ Built with .NET $env:DOTNET_VERSION`n"
-        $changelog += "- ⚛️ React frontend included`n"
-        $changelog += "- 📋 Self-contained deployment package`n`n"
-        $changelog += "### 📋 Release Information`n"
-        $changelog += "- 🏷️ **Version**: $env:RELEASE_VERSION`n"
-        $changelog += "- 📅 **Build Date**: $buildDate`n"
-        $changelog += "- 🔗 $compareLink`n`n"
-        $changelog += "---`n"
-        $changelog += "*This release was automatically generated by GitHub Actions* 🤖"
-        
-        # Save to output without URL encoding
-        $changelogFile = "changelog.txt"
-        $changelog | Out-File -FilePath $changelogFile -Encoding UTF8
-        echo "changelogfile=$changelogFile" >> $env:GITHUB_OUTPUT
-      shell: pwsh
+        Compress-Archive -Path "./publish-module/*" -DestinationPath "./release_assets/UnifiedContactsPS.zip" -Force
 
     - name: Create Release
-      id: create-release
-      # zizmor: ignore[superfluous-actions] - pinned gh-release action is intentionally used over gh CLI for its file-glob upload handling
-      uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+      uses: glueckkanja/action-attach-assets-to-release@bbabe998fafc70062e3b85dcb39867ffba1402b8 # v0.1.0
       with:
-        tag_name: ${{ steps.get-version.outputs.version }}
-        name: UnifiedContacts ${{ steps.get-version.outputs.version }}
-        body_path: ${{ steps.changelog.outputs.changelogfile }}
-        draft: false
-        prerelease: ${{ github.event.inputs.prerelease == 'true' }}
-        files: |
-          ./binaries.zip
-          ./UnifiedContactsPS.zip
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        release_id: ${{ needs.generate_version.outputs.release_id }}
+        asset_path: "release_assets"
+        publish_draft_release: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
-        name: unified-contacts-${{ steps.get-version.outputs.version }}
+        name: unified-contacts-${{ needs.generate_version.outputs.tag }}
         path: |
-          ./binaries.zip
-          ./UnifiedContactsPS.zip
+          ./release_assets/binaries.zip
+          ./release_assets/UnifiedContactsPS.zip
           ./publish/
         retention-days: 30
-
-
