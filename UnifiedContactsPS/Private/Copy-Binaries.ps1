@@ -11,11 +11,8 @@ function Copy-Binaries {
     $assetName = "binaries.zip"
     
     try {
-        # Get the access token with the new secure string parameter
-        $token = Get-AzAccessToken -ResourceUrl "https://storage.azure.com/" -AsSecureString
-        
-        # Setup Azure Storage context with the token
-        $destContext = New-AzStorageContext -StorageAccountName $Destination -SasToken $token
+        # Setup Azure Storage context using the signed-in Azure AD account (requires Storage Blob Data Contributor)
+        $destContext = New-AzStorageContext -StorageAccountName $Destination -UseConnectedAccount
         
         try { 
             New-AzStorageContainer -Name $Script:destinationContainer -Context $destContext -Permission Blob 
@@ -45,16 +42,24 @@ function Copy-Binaries {
             throw "Asset '$assetName' not found in the $Channel"
         }
 
-        Write-Host "Copying $assetName from $Channel $($selectedRelease.tag_name) to Azure Storage..."
-        
-        # Start the copy operation directly from GitHub to Azure Blob Storage
-        Start-AzStorageBlobCopy -AbsoluteUri $asset.browser_download_url `
-            -DestContainer $Script:destinationContainer `
-            -DestBlob $Script:destinationBlob `
-            -DestContext $destContext `
-            -Force | Out-Null
+        Write-Host "Downloading $assetName from $Channel $($selectedRelease.tag_name)..."
 
-        Write-Host "Successfully initiated copy to Azure Storage"
+        # GitHub answers with a 302 to a CDN url, which Azure server-side copy cannot follow - download and upload instead
+        $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) "binaries_$([guid]::NewGuid()).zip"
+        try {
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $tempFile
+            Write-Host "Uploading $assetName to Azure Storage..."
+            Set-AzStorageBlobContent -File $tempFile `
+                -Container $Script:destinationContainer `
+                -Blob $Script:destinationBlob `
+                -Context $destContext `
+                -Force | Out-Null
+        }
+        finally {
+            Remove-Item $tempFile -ErrorAction SilentlyContinue
+        }
+
+        Write-Host "Successfully copied $assetName to Azure Storage"
         
         # Return release information for further processing
         return @{

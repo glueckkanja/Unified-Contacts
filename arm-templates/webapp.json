@@ -71,7 +71,7 @@
           "alwaysOn": "true",
           "ftpsState": "FtpsOnly",
           "use32BitWorkerProcess": false,
-					"linuxFxVersion": "DOTNETCORE|6.0"
+					"linuxFxVersion": "DOTNETCORE|10.0"
         },
         "clientAffinityEnabled": true
       },

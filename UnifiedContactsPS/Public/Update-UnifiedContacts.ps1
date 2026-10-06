@@ -2,10 +2,10 @@
     [CmdletBinding()]
     Param(
         [Parameter (Mandatory = $true, HelpMessage = "The Url you can copy from your browser when you open the App Service. Format: https://portal.azure.com/#<domain>/resource/subscriptions/<subscriptionId>/resourceGroups/<ressourceGroupName>/providers/Microsoft.Web/sites/<appServiceName>/appServices")][string]$AppServiceAzureUrl,
-        [Parameter (Mandatory = $false, HelpMessage = "Choose your release channel.")][string]$ReleaseChannel = $null
+        [Parameter (Mandatory = $false, HelpMessage = "Choose your release channel.")][ValidateSet('Release', 'Prerelease')][string]$ReleaseChannel
     )
     $ErrorActionPreference = "Stop"
-    #$Script:AppServiceAzureUrl = $AppServiceAzureUrl;
+    $currentStep = "Initialization"
     $resourceGroup = (($AppServiceAzureUrl -Split "resourceGroups/")[1] -Split "/")[0]
     $subscriptionId = (($AppServiceAzureUrl -Split "subscriptions/")[1] -Split "/")[0]
     $appServiceName = (($AppServiceAzureUrl -Split "sites/")[1] -Split "/")[0]
@@ -27,13 +27,7 @@
         elseif ($context.Subscription.Id -ne $subscriptionId) {
             [void] (Set-AzContext -Subscription $subscriptionId)
         }
-        az account set --subscription $subscriptionId | Out-Null
-        $response = Invoke-WebRequest -Uri $Script:versionManifesUri -UseBasicParsing
-        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
-            throw "Could not accquire versionManifest"
-        }
-        Write-Progress -Activity "Update Unified Contacts" -Status "Get Web App Information" -PercentComplete 5
-        $versionManifest = $response.Content | ConvertFrom-Json
+        Write-Step "Get Web App Information" 5 -Activity "Update Unified Contacts"
         $appService = Get-AzWebApp -ResourceGroupName  $resourceGroup -Name $appServiceName
         if ($null -eq ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq $Script:AppServiceAzureUrlPropertyName })) {
             $settings = @{}
@@ -45,28 +39,30 @@
         }
         
         $storageAccountName = ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq $Script:storageAccountPropertyName }).value 
-        $token = Get-AzAccessToken -ResourceUrl "https://storage.azure.com/" -AsSecureString
-        $destContext = New-AzStorageContext -StorageAccountName $storageAccountName -SasToken $token
-        $me = Get-AzADUser -UserPrincipalName (az account show --query user.name --output tsv)
+        $destContext = New-AzStorageContext -StorageAccountName $storageAccountName -UseConnectedAccount
+        $me = Get-SignedInUser
         
-        Write-Progress -Activity "Update Unified Contacts" -Status "Check necessary permissions" -PercentComplete 15
-        $role = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Blob Data Contributor"
-        if ($null -eq $role) {
-            New-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Blob Data Contributor" | Out-Null
-            $roleReady = $null 
-            while ($null -eq $roleReady) {
-                Start-Sleep -Seconds 10
-                $roleReady = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Blob Data Contributor"
+        Write-Step "Check necessary permissions" 15 -Activity "Update Unified Contacts"
+        # Update-Infrastructure creates the UpdateLog table, so both blob and table roles are needed up front
+        foreach ($roleName in @("Storage Blob Data Contributor", "Storage Table Data Contributor")) {
+            $role = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName $roleName
+            if ($null -eq $role) {
+                New-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName $roleName | Out-Null
+                $roleReady = $null 
+                while ($null -eq $roleReady) {
+                    Start-Sleep -Seconds 10 #wait for roleassignment to be present in Entra Id
+                    $roleReady = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName $roleName
+                }
             }
         }
 
-        Write-Progress -Activity "Update Unified Contacts" -Status "Get selected release channel" -PercentComplete 25
+        Write-Step "Get selected release channel" 25 -Activity "Update Unified Contacts"
 
         # Get releases from GitHub
-        $repoReleases = Invoke-RestMethod -Uri "https://github.com/glueckkanja/Unified-Contacts/releases"
+        $repoReleases = Invoke-RestMethod -Uri "https://api.github.com/repos/$($Script:repoUrl)/releases"
         
         # Default to latest stable release if no channel specified
-        if ($null -eq $releaseChannel) {
+        if ([string]::IsNullOrEmpty($ReleaseChannel)) {
             $title = "From which release channel do you want to update?"
             $prompt = "Enter your choice"
             $default = 0
@@ -74,25 +70,34 @@
                 [System.Management.Automation.Host.ChoiceDescription]"&Release"
                 [System.Management.Automation.Host.ChoiceDescription]"&Prerelease"
             )
-            $releaseChannel = $host.UI.PromptForChoice($title, $prompt, $choices, $default)
+            $choice = $host.UI.PromptForChoice($title, $prompt, $choices, $default)
+            $ReleaseChannel = if ($choice -eq 0) { 'Release' } else { 'Prerelease' }
         }
         
         # Select the appropriate release based on channel
-        if ($releaseChannel -eq 0) {
+        if ($ReleaseChannel -eq 'Release') {
             # Latest stable release
             $selectedRelease = $repoReleases | Where-Object { -not $_.prerelease } | Select-Object -First 1
         } else {
             # Latest prerelease
-            $selectedRelease = $repoReleases | Select-Object -First 1
+            $selectedRelease = $repoReleases | Where-Object { $_.prerelease } | Select-Object -First 1
+        }
+        
+        if ($null -eq $selectedRelease) {
+            throw "No $ReleaseChannel found on GitHub ($($Script:repoUrl))"
         }
         
         $selectedChannel = @{
-            name = if ($releaseChannel -eq 0) { "release" } else { "prerelease" }
+            name = $ReleaseChannel.ToLower()
             latestVersion = $selectedRelease.tag_name
             latestVersionRef = ($selectedRelease.assets | Where-Object { $_.name -eq "binaries.zip" }).browser_download_url
         }
+        
+        if ($null -eq $selectedChannel.latestVersionRef) {
+            throw "Asset 'binaries.zip' not found in release $($selectedRelease.tag_name)"
+        }
 
-        Write-Progress -Activity "Update Unified Contacts" -Status "Update Infrastructure" -PercentComplete 40
+        Write-Step "Update Infrastructure" 40 -Activity "Update Unified Contacts"
         Update-Infrastructure -SubscriptionId  $subscriptionId -destContext $destContext -resourceGroupName $resourceGroup -storageAcccountName $storageAccountName -AppServiceName $appServiceName -selectedVersion $selectedChannel.latestVersion
 
         $currentVersion = ((Get-Version -AppService $appService).Content | ConvertFrom-Json).version
@@ -100,19 +105,10 @@
             Write-Host "The latest version is already deployed." -ForegroundColor Yellow
             return; 
         }
-        Write-Progress -Activity "Update Unified Contacts" -Status "Copy Binaries" -PercentComplete 65
-        Start-AzStorageBlobCopy -AbsoluteUri $selectedChannel.latestVersionRef -DestContainer "unified-contacts" -DestBlob "binaries.zip" -DestContext $destContext -Force | Out-Null
-        $role = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Table Data Contributor"
-        if ($null -eq $role) {
-            New-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Table Data Contributor" | Out-Null
-            $roleReady = $null 
-            while ($null -eq $roleReady) {
-                Start-Sleep -Seconds 10  #wait for roleassignment to be present in Entra Id
-                $roleReady = Get-AzRoleAssignment -ObjectId $me.Id -Scope "/subscriptions/$subscriptionId/resourceGroups/$resourceGroup/providers/Microsoft.Storage/storageAccounts/$storageAccountName/" -RoleDefinitionName "Storage Table Data Contributor"
-            }
-        }
+        Write-Step "Copy Binaries" 65 -Activity "Update Unified Contacts"
+        Copy-Binaries -Destination $storageAccountName -Channel $selectedChannel.name | Out-Null
 
-        Write-Progress -Activity "Update Unified Contacts" -Status "Restart Web App" -PercentComplete 75
+        Write-Step "Restart Web App" 75 -Activity "Update Unified Contacts"
         Restart-AzWebApp -ResourceGroupName $resourceGroup -Name $appServiceName | Out-Null
         Start-Sleep -Seconds 20
         $timeout = (Get-Date).AddMinutes(5)
@@ -149,7 +145,8 @@
         }
     }
     catch {
-        Write-Error "Something went wrong please. Try again later. Error: $_" -ErrorAction 'Continue'
+        Write-DetailedError -ErrorRecord $_ -Step $currentStep
+        Write-Error "Update failed at step '$currentStep'. Please try again later. Error: $($_.Exception.Message)" -ErrorAction 'Continue'
     }
 }
 
