@@ -102,10 +102,17 @@ namespace UnifiedContacts.Controllers
 
         private static IEnumerable<SearchEngineResultDto> GetResultsWithContainingSearchQuery(IEnumerable<SearchEngineResultDto> listToFilter, string searchQuery)
         {
+            string[] terms = searchQuery.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (terms.Length == 0)
+            {
+                terms = new[] { searchQuery };
+            }
+
             return listToFilter.Where((result) =>
             {
-                IEnumerable<string> allStringValues = GetAllStringValues(result);
-                return allStringValues.Any(str => str.Contains(searchQuery, StringComparison.OrdinalIgnoreCase));
+                List<string> allStringValues = GetAllStringValues(result).ToList();
+                // Every term must match somewhere (not necessarily the same field), so "John Doe" also matches givenName="John" + surname="Doe"
+                return terms.All(term => allStringValues.Any(str => str.Contains(term, StringComparison.OrdinalIgnoreCase)));
             });
         }
 
