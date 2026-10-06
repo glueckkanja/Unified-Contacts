@@ -11,7 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@azure/msal-react": "^2.2.0",
+    "@azure/msal-react": "^5.7.1",
     "@fluentui/react": "^8.121.12",
     "@fluentui/react-components": "^9.56.2",
     "@microsoft/teams-js": "^2.31.0",
