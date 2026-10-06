@@ -22,7 +22,6 @@
     }
     #refresh Context
     $context = Get-AzContext
-    $User = (az account show --query user.name --output tsv)
     try {
         $appService = Get-AzWebApp -ResourceGroupName  $ResourceGroup -Name $AppServiceName
         if ($appService) {
@@ -34,14 +33,14 @@
                 Remove-AzADApplication -DisplayName $adminAppName | Out-Null
             }
             catch {
-                #fall througgh
+                Write-Warning "Could not remove app registrations: $($_.Exception.Message)"
             }
        
             try {
                 $VaultName = ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq "KeyVaultName" }).value
                 if ($VaultName) {
 
-                    Set-AzKeyVaultAccessPolicy -VaultName $VaultName -UserPrincipalName $User -PermissionsToSecrets get, set, delete, list | Out-Null
+                    Set-AzKeyVaultAccessPolicy -VaultName $VaultName -ObjectId (Get-SignedInUser).Id -PermissionsToSecrets get, set, delete, list | Out-Null
                     $keyVaultSecrets = Get-AzKeyVaultSecret -VaultName $VaultName
                     foreach ($secret in $keyVaultSecrets) {
                         Remove-AzKeyVaultSecret -VaultName $VaultName -Name $secret.Name -Force | Out-Null
@@ -49,7 +48,7 @@
                 }
             }
             catch {
-                #fall througgh
+                Write-Warning "Could not remove Key Vault secrets: $($_.Exception.Message)"
             }
             try {
                 $fireWallRule = Get-AzSqlServerFirewallRule -ResourceGroupName $ResourceGroup -ServerName ($appService.SiteConfig.AppSettings | where-object { $_.Name -eq "SQLServer" }).value -FirewallRuleName AllowAllAzureIPs
@@ -58,13 +57,13 @@
                 }
             }
             catch {
-                #fall througgh
+                Write-Warning "Could not remove SQL firewall rule: $($_.Exception.Message)"
             }
         }
         Write-Host "Uninstallation of Unified Contacts was successful" -ForegroundColor Green
     }
     catch {
-        #fall througgh
+        Write-DetailedError -ErrorRecord $_ -Step "Uninstall"
     }
     
     Remove-AzResourceGroup -Name $ResourceGroup 

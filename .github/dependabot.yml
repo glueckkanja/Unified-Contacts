@@ -9,11 +9,17 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "npm" # See documentation for possible values
     directory: "/UnifiedContacts/unifiedcontacts.client" # Location of package manifests
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "nuget" # See documentation for possible values
     directory: "/UnifiedContacts/UnifiedContacts.Server" # Location of package manifests
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7

@@ -138,7 +138,7 @@ export const TeamsPage = (props: TeamsPageProps) => {
     setHideAdditionalPermissionsGrant(true);
     cachingService.clearAdditionalPermissionsGrantSettingTimestamp();
     let adminGrantUrl = StaticSettings.adminGrantUrl;
-    if (versionInfo?.edition.toLowerCase() === "free") {
+    if (versionInfo?.edition?.toLowerCase() === "free") {
       adminGrantUrl = StaticSettings.adminGrantUrlFree;
     }
     window.open(adminGrantUrl.replace("[[clientId]]", clientId));

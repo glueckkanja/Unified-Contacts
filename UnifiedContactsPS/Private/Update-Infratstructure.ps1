@@ -19,7 +19,7 @@ function Update-Infrastructure {
         Start-Sleep -Seconds 5
     }
 
-    if ($null -eq (Get-AzStorageTable -Table $Script:tableName  -Context $DestContext -ErrorAction SilentlyContinue)) {
+    if ($null -eq (Get-AzStorageTable -Name $Script:tableName -Context $DestContext -ErrorAction SilentlyContinue)) {
         New-AzStorageTable -Name $Script:tableName -Context $DestContext | Out-Null
     }
     $timeout = (Get-Date).AddMinutes(10)

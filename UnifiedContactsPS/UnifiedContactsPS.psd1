@@ -13,13 +13,16 @@
     Copyright            = '(c) 2024 glueckkanja AG. All rights reserved.'
     Description          = 'UnifiedContactsPS'
     PowerShellVersion    = '7.1'
+    RequiredModules      = @('Az.Accounts', 'Az.Resources', 'Az.Websites', 'Az.Storage', 'Az.KeyVault', 'Az.Sql', 'AzTable')
     FunctionsToExport    = @('Install-UnifiedContacts', 'Reset-UnifiedContacts', 'Uninstall-UnifiedContacts', 'Update-UnifiedContacts')
     CmdletsToExport      = @() 
     VariablesToExport    = @() 
     AliasesToExport      = @() 
     PrivateData          = @{
         PSData = @{
-            IconUri = 'https://unifiedcontacts.blob.core.windows.net/arm-templates/Unified-Contacts-Pro-350.png'
+            IconUri    = 'https://unifiedcontacts.blob.core.windows.net/arm-templates/Unified-Contacts-Pro-350.png'
+            ProjectUri = 'https://github.com/glueckkanja/Unified-Contacts'
+            LicenseUri = 'https://github.com/glueckkanja/Unified-Contacts/blob/main/LICENSE'
         } 
     } 
 }

@@ -84,7 +84,7 @@ namespace UnifiedContacts.Controllers
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
                 }))?.Value!.FirstOrDefault();
-                if (oauth2PermissionGrant == null && oauth2PermissionGrant?.Scope == null)
+                if (oauth2PermissionGrant == null || oauth2PermissionGrant.Scope == null)
                 {
                     return new GetDependenciesStatusDependency(UnifiedContactStaticStrings.HEALTH_STATE_DISPLAY_NAME_TEAMS_APP_REGISTRATION, DependencyStatus.WARNING, "Admin constent not granted");
                 }
@@ -335,7 +335,7 @@ namespace UnifiedContacts.Controllers
                 return Ok(new GetManifestInfoResponse()
                 {
                     TeamsManifestExists = true,
-                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
+                    TeamsManifestUpdatePossible = appDefinitions.Version != StaticSettings.MANIFEST_VERSION && StaticSettings.VERSION != "/INTERNAL_BUILD/",
                     TeamsManifestVersion = appDefinitions.Version,
                     ApiVersion = StaticSettings.VERSION
                 });
@@ -356,7 +356,7 @@ namespace UnifiedContacts.Controllers
             bool manifestUpdateSuccessfull = false;
             try
             {
-                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.VERSION);
+                manifestUpdateSuccessfull = await TryUploadManifest(manifestSettings.DisplayName, manifestSettings.ShortDescription, manifestSettings.LongDescription, manifestSettings.ApiDomain, _authSettings.ClientId, StaticSettings.MANIFEST_VERSION);
             }
             catch (HttpResponseException e)
             {
@@ -425,18 +425,95 @@ namespace UnifiedContacts.Controllers
 
         #region Update
 
+        // Cache shields the admin page from GitHub's unauthenticated rate limit (60 requests/hour per ip)
+        private static VersionManifestDto? _cachedVersionManifest;
+        private static DateTime _cachedVersionManifestExpiry = DateTime.MinValue;
+        private static readonly SemaphoreSlim _versionManifestLock = new(1, 1);
+
         private async Task<VersionManifestDto> GetVersionManifest()
         {
-            HttpClient client = _httpClientFactory.CreateClient("default");
-            HttpResponseMessage versionManifestRequest = await client.GetAsync(StaticSettings.VERSION_MANIFEST_URL);
-            string versionManifestJsonString = await versionManifestRequest.Content.ReadAsStringAsync();
-            VersionManifestDto? versionManifest = JsonSerializer.Deserialize<VersionManifestDto>(versionManifestJsonString, JsonSerializerOptionsDefaults.GetDefaultOptions());
-
-            if (versionManifest == null)
+            if (_cachedVersionManifest != null && DateTime.UtcNow < _cachedVersionManifestExpiry)
             {
-                throw new Exception("Version manifest could not be acquired");
+                return _cachedVersionManifest;
             }
-            return versionManifest;
+
+            await _versionManifestLock.WaitAsync();
+            try
+            {
+                if (_cachedVersionManifest != null && DateTime.UtcNow < _cachedVersionManifestExpiry)
+                {
+                    return _cachedVersionManifest;
+                }
+
+                try
+                {
+                    VersionManifestDto manifest = await FetchVersionManifestFromGitHub();
+                    _cachedVersionManifest = manifest;
+                    _cachedVersionManifestExpiry = DateTime.UtcNow.AddMinutes(5);
+                    return manifest;
+                }
+                catch when (_cachedVersionManifest != null)
+                {
+                    // Serve stale data instead of a 500 when GitHub is unavailable or rate-limited
+                    return _cachedVersionManifest;
+                }
+            }
+            finally
+            {
+                _versionManifestLock.Release();
+            }
+        }
+
+        private async Task<VersionManifestDto> FetchVersionManifestFromGitHub()
+        {
+            HttpClient client = _httpClientFactory.CreateClient("default");
+            using HttpRequestMessage request = new(HttpMethod.Get, StaticSettings.GITHUB_RELEASES_URL);
+            // GitHub API rejects requests without a user agent
+            request.Headers.UserAgent.ParseAdd("UnifiedContacts");
+            HttpResponseMessage versionManifestRequest = await client.SendAsync(request);
+            versionManifestRequest.EnsureSuccessStatusCode();
+            string releasesJsonString = await versionManifestRequest.Content.ReadAsStringAsync();
+            List<GitHubReleaseDto>? releases = JsonSerializer.Deserialize<List<GitHubReleaseDto>>(releasesJsonString, JsonSerializerOptionsDefaults.GetDefaultOptions());
+
+            if (releases == null)
+            {
+                throw new Exception("GitHub releases could not be acquired");
+            }
+
+            static VersionManifestDtoChannel? ToChannel(GitHubReleaseDto? release, string name, bool isDefault)
+            {
+                string? binariesUrl = release?.Assets?.FirstOrDefault(asset => asset.Name == StaticSettings.RELEASE_BINARIES_ASSET_NAME)?.BrowserDownloadUrl;
+                if (release == null || binariesUrl == null)
+                {
+                    return null;
+                }
+                return new VersionManifestDtoChannel
+                {
+                    Default = isDefault,
+                    Name = name,
+                    LatestVersion = release.TagName,
+                    LatestVersionRef = binariesUrl
+                };
+            }
+
+            List<VersionManifestDtoChannel> channels = new();
+            VersionManifestDtoChannel? stable = ToChannel(releases.FirstOrDefault(release => !release.Draft && !release.Prerelease), "stable", true);
+            if (stable != null)
+            {
+                channels.Add(stable);
+            }
+            VersionManifestDtoChannel? prerelease = ToChannel(releases.FirstOrDefault(release => !release.Draft && release.Prerelease), "prerelease", false);
+            if (prerelease != null)
+            {
+                channels.Add(prerelease);
+            }
+
+            if (channels.Count == 0)
+            {
+                throw new Exception("No usable releases found on GitHub");
+            }
+
+            return new VersionManifestDto { Channels = channels };
         }
 
         /// <summary>
@@ -534,30 +611,25 @@ namespace UnifiedContacts.Controllers
                 }
 
                 Azure.Storage.Blobs.BlobClient blobClient = _blobServiceDto.Client.GetBlobContainerClient(StaticSettings.BLOB_STORAGE_CONTAINER_NAME).GetBlobClient(StaticSettings.BLOB_STORAGE_BLOB_NAME);
-                _ = blobClient.DeleteIfExistsAsync().ContinueWith(async (deleteTask) =>
+                // GitHub asset urls answer with a 302 redirect which Azure server-side copy cannot follow - stream the download instead
+                _ = Task.Run(async () =>
                 {
-                    if (deleteTask.IsCanceled || deleteTask.IsFaulted)
+                    try
+                    {
+                        HttpClient downloadClient = _httpClientFactory.CreateClient("default");
+                        using HttpRequestMessage downloadRequest = new(HttpMethod.Get, channelInfo.LatestVersionRef);
+                        downloadRequest.Headers.UserAgent.ParseAdd("UnifiedContacts");
+                        using HttpResponseMessage downloadResponse = await downloadClient.SendAsync(downloadRequest, HttpCompletionOption.ResponseHeadersRead);
+                        downloadResponse.EnsureSuccessStatusCode();
+                        using Stream assetStream = await downloadResponse.Content.ReadAsStreamAsync();
+                        await blobClient.UploadAsync(assetStream, overwrite: true);
+                        _updateStatusDto.RestartRequired = true;
+                        _updateStatusDto.IsUpdatePending = false;
+                    }
+                    catch (Exception)
                     {
                         _updateStatusDto.IsUpdatePending = false;
                         _updateStatusDto.RestartRequired = false;
-                    }
-                    else
-                    {
-                        Azure.Storage.Blobs.Models.CopyFromUriOperation copyInfo = await blobClient.StartCopyFromUriAsync(new Uri(channelInfo.LatestVersionRef));
-
-                        _ = copyInfo.WaitForCompletionAsync().AsTask().ContinueWith((copyTask) =>
-                        {
-                            if (copyTask.IsCanceled || copyTask.IsFaulted)
-                            {
-                                _updateStatusDto.IsUpdatePending = false;
-                                _updateStatusDto.RestartRequired = false;
-                            }
-                            else
-                            {
-                                _updateStatusDto.RestartRequired = true;
-                                _updateStatusDto.IsUpdatePending = false;
-                            }
-                        });
                     }
                 });
 
