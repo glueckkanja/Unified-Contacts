@@ -32,7 +32,7 @@ namespace UnifiedContacts.Engines.SearchEngines
                 if (string.IsNullOrWhiteSpace(contactDisplayName))
                 {
                     contactDisplayName = $"{contact.GivenName} {contact.MiddleName} {contact.Surname}";
-                    contactDisplayName.Replace("  ", " "); // If contact has no middle name two consecutive spaces are present -> Clean them up
+                    contactDisplayName = contactDisplayName.Replace("  ", " ").Trim(); // If contact has no middle name two consecutive spaces are present -> Clean them up
                     if (string.IsNullOrWhiteSpace(contactDisplayName))
                     {
                         contactDisplayName = contact.NickName ?? " ";
@@ -82,8 +82,8 @@ namespace UnifiedContacts.Engines.SearchEngines
             {
                 contacts = await graphClient.Me.Contacts.GetAsync((requestConfiguration) =>
                 {
-                    requestConfiguration.QueryParameters.Filter = USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery);
-                    requestConfiguration.QueryParameters.Select = new string[] { "id", "imAddresses", "mobilePhone", "businessPhones", "companyName", "department", "jobTitle", "businessAddress", "homeAddress", "otherAddress", "emailAddresses", "homePhones", "givenName", "surName", "middleName", "nickName" };
+                    requestConfiguration.QueryParameters.Filter = USER_CONTACTS_GRAPH_FILTER_TEMPLATE.Replace(SEARCH_QUERY_PLACEHOLDER, searchQuery.Replace("'", "''"));
+                    requestConfiguration.QueryParameters.Select = new string[] { "id", "displayName", "imAddresses", "mobilePhone", "businessPhones", "companyName", "department", "jobTitle", "businessAddress", "homeAddress", "otherAddress", "emailAddresses", "homePhones", "givenName", "surName", "middleName", "nickName" };
                     requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
                     requestConfiguration.QueryParameters.Count = true;
                 });
@@ -136,10 +136,18 @@ namespace UnifiedContacts.Engines.SearchEngines
                 BatchResponseContentCollection batchResponseContent = await graphClient.Batch.PostAsync(batchRequestContent);
                 foreach (string step in stepIds)
                 {
-                    Contact contact = await batchResponseContent.GetResponseByIdAsync<Contact>(step);
-                    if (contact != null)
+                    try
                     {
-                        userContactsItemBatchResponses.Add(step, contact);
+                        Contact contact = await batchResponseContent.GetResponseByIdAsync<Contact>(step);
+                        if (contact != null)
+                        {
+                            userContactsItemBatchResponses.Add(step, contact);
+                        }
+                    }
+                    // Favorited contact was deleted; skip it instead of failing the whole favorites request.
+                    catch (ApiException e) when (e.ResponseStatusCode == (int)System.Net.HttpStatusCode.NotFound)
+                    {
+                        continue;
                     }
                 }
             }

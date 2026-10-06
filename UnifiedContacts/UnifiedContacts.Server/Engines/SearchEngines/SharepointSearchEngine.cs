@@ -246,10 +246,18 @@ namespace UnifiedContacts.Engines.SearchEngines
             BatchResponseContentCollection batchResponseContent = await graphClient.Batch.PostAsync(batchRequestContent);
             foreach (string step in stepIds)
             {
-                ListItem listItem = await batchResponseContent.GetResponseByIdAsync<ListItem>(step);
-                if (listItem != null)
+                try
                 {
-                    sharepointItemBatchResponses.Add(step, listItem);
+                    ListItem listItem = await batchResponseContent.GetResponseByIdAsync<ListItem>(step);
+                    if (listItem != null)
+                    {
+                        sharepointItemBatchResponses.Add(step, listItem);
+                    }
+                }
+                // Favorited SharePoint item was deleted; skip it instead of failing the whole favorites request.
+                catch (ApiException e) when (e.ResponseStatusCode == (int)System.Net.HttpStatusCode.NotFound)
+                {
+                    continue;
                 }
             }
             return ConvertToSearchEngineResults(sharepointItemBatchResponses);
