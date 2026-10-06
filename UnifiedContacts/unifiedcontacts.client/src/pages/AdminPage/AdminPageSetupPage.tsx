@@ -95,7 +95,7 @@ export function AdminPageSetupPage() {
               <img src={CopyIconRegular} alt="Copy Icon" />
             </Button>
             <Overlay
-              target={copyButtonTarget.current}
+              target={copyButtonTarget}
               show={showCopiedTooltip}
               placement="top"
             >

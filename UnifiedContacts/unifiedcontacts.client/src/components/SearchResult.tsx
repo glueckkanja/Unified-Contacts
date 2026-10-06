@@ -25,6 +25,25 @@ import {
 import { TeamsPageAlertServiceContext } from "../providers/TeamsPageAlertServiceContextProvider";
 const TILE_SIZE_REM = 30;
 const TILE_COLUMN_GAP_REM = 1;
+
+const calculateResultCardContainerWidth = (): number | undefined => {
+  if (window.innerWidth <= 1100) {
+    // Mobile version
+    return undefined;
+  }
+  // Desktop version
+  const remFactor = parseFloat(
+    getComputedStyle(document.documentElement).fontSize
+  );
+  const tileSizeInPx = TILE_SIZE_REM * remFactor;
+  let contentWidth = window.innerWidth - 2 * (3 * remFactor); //Total width - padding left and right
+  contentWidth ??= 600;
+  const tileCountMax = Math.floor(contentWidth / tileSizeInPx);
+  return (
+    tileCountMax * tileSizeInPx +
+    (tileCountMax - 1) * TILE_COLUMN_GAP_REM * remFactor
+  );
+};
 export type SearchResultProps = {
   searchState: TUnfiedSearchState;
   presence: TUnifiedContactsPresenceResponse[];
@@ -44,8 +63,9 @@ export type SearchResultProps = {
 export function SearchResult(props: SearchResultProps) {
   const teamsAlertService = useContext(TeamsPageAlertServiceContext);
 
-  const [resultCardContainerWidth, setResultCardContainerWidth] =
-    useState<number>();
+  const [resultCardContainerWidth, setResultCardContainerWidth] = useState<
+    number | undefined
+  >(calculateResultCardContainerWidth);
   let cachedTileSize = cachingService.getUserSettings().selectedTileSize;
   if (!cachedTileSize) {
     cachedTileSize =
@@ -56,26 +76,8 @@ export function SearchResult(props: SearchResultProps) {
   const [tileSize, setTileSize] = useState<TILE_FORMAT>(cachedTileSize);
 
   const handleResize = useCallback(() => {
-    if (window.innerWidth > 1100) {
-      // Desktop version
-      const remFactor = parseFloat(
-        getComputedStyle(document.documentElement).fontSize
-      );
-      const tileSizeInPx = TILE_SIZE_REM * remFactor;
-      let contentWidth = window.innerWidth - 2 * (3 * remFactor); //Total width - padding left and right
-      contentWidth ??= 600;
-      const tileCountMax = Math.floor(contentWidth / tileSizeInPx);
-      setResultCardContainerWidth(
-        tileCountMax * tileSizeInPx +
-          (tileCountMax - 1) * TILE_COLUMN_GAP_REM * remFactor
-      );
-    } else if (
-      resultCardContainerWidth !== 0 /* Prevent unnecessary re-render */
-    ) {
-      // Mobile version
-      setResultCardContainerWidth(undefined);
-    }
-  }, [resultCardContainerWidth]);
+    setResultCardContainerWidth(calculateResultCardContainerWidth());
+  }, []);
 
   const updateTileSize = (tileSize: TILE_FORMAT) => {
     setTileSize(tileSize);
@@ -134,7 +136,6 @@ export function SearchResult(props: SearchResultProps) {
     }
   };
   useEffect(() => {
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);

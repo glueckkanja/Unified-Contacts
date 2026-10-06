@@ -657,6 +657,8 @@ export function SearchPageSearchBox(props: SearchPageSearchBoxProps) {
     global_searchResultPendingPromises = [];
     setInitialCacheLoadCompletedFalse();
     if (props.tenantId) {
+      // Resets state from the tenant-specific cache when the tenant changes
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadCache();
     } else {
       setAllSearchState({
