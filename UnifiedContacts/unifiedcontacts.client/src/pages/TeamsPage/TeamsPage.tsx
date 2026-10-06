@@ -244,8 +244,7 @@ export const TeamsPage = (props: TeamsPageProps) => {
   }, []);
 
   useEffect(() => {
-    // State updates happen asynchronously after the awaited API calls
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is only set after await
     checkAdminGrant();
     getCurrentDatabaseInfo();
   }, [checkAdminGrant, getCurrentDatabaseInfo]);
@@ -276,6 +275,7 @@ export const TeamsPage = (props: TeamsPageProps) => {
               )}
               {props.pageType === PAGE_TYPE.SEARCH && (
                 <SearchPageSearchBox
+                  key={tenantId}
                   theme={theme}
                   checkAdminGrant={checkAdminGrant}
                   tenantId={tenantId}
