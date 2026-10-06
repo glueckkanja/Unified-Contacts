@@ -420,12 +420,12 @@ export function AdminPageContentSettings() {
   };
 
   const removeIpAddress = (ipAddressToRemove: string): void => {
-    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data;
-    if (newData) {
-      newData.allowedIpAddresses = newData?.allowedIpAddresses.filter(
+    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data && {
+      ...sbcSettings.data,
+      allowedIpAddresses: sbcSettings.data.allowedIpAddresses.filter(
         (ip) => ip !== ipAddressToRemove
-      );
-    }
+      ),
+    };
     setSbcSettings((prev) => {
       return {
         ...prev,
@@ -436,10 +436,10 @@ export function AdminPageContentSettings() {
   };
 
   const onToggleEnableSbcLookupEndpoint = (enabled: boolean): void => {
-    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data;
-    if (newData) {
-      newData.endpointEnabled = enabled;
-    }
+    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data && {
+      ...sbcSettings.data,
+      endpointEnabled: enabled,
+    };
     setSbcSettings((prev) => {
       return {
         ...prev,
@@ -450,10 +450,10 @@ export function AdminPageContentSettings() {
   };
 
   const onToggleEnableSbcLookupAnyNodeEndpoint = (enabled: boolean): void => {
-    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data;
-    if (newData) {
-      newData.anyNodeEndpointEnabled = enabled;
-    }
+    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data && {
+      ...sbcSettings.data,
+      anyNodeEndpointEnabled: enabled,
+    };
     setSbcSettings((prev) => {
       return {
         ...prev,
@@ -464,10 +464,10 @@ export function AdminPageContentSettings() {
   };
 
   const onToggleEnableIpAuthentication = (enabled: boolean): void => {
-    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data;
-    if (newData) {
-      newData.ipAuthenticationEnabled = enabled;
-    }
+    const newData: TSbcLookupSettingsState | undefined = sbcSettings.data && {
+      ...sbcSettings.data,
+      ipAuthenticationEnabled: enabled,
+    };
     setSbcSettings((prev) => {
       return {
         ...prev,
@@ -1064,7 +1064,7 @@ export function AdminPageContentSettings() {
                         )}
                       </Button>
                       <Overlay
-                        target={applySbcEndpointCredentialsButton.current}
+                        target={applySbcEndpointCredentialsButton}
                         show={sbcEndpointCredentialSuccess}
                         placement="left"
                       >

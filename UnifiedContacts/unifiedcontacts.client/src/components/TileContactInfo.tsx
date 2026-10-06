@@ -23,17 +23,11 @@ const TileContactInfoMenuList = (props: ContactInfoCopyProps) => {
   const setDropDownDirection = () => {
     setDropDownIconDown(!dropDownIconDown);
   };
-  const DropDownIcon = () => {
-    if (dropDownIconDown) {
-      return (
-        <ChevronDown24Regular className="tile-contact-info__dropdown-icon" />
-      );
-    } else {
-      return (
-        <ChevronUp24Regular className="tile-contact-info__dropdown-icon" />
-      );
-    }
-  };
+  const dropDownIcon = dropDownIconDown ? (
+    <ChevronDown24Regular className="tile-contact-info__dropdown-icon" />
+  ) : (
+    <ChevronUp24Regular className="tile-contact-info__dropdown-icon" />
+  );
   return (
     <Menu onOpenChange={setDropDownDirection}>
       <MenuTrigger>
@@ -45,7 +39,7 @@ const TileContactInfoMenuList = (props: ContactInfoCopyProps) => {
           <Button
             className="tile-contact-info__dropdown-icon"
             appearance="transparent"
-            icon={<DropDownIcon />}
+            icon={dropDownIcon}
           />
         </div>
       </MenuTrigger>

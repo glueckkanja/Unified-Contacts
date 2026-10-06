@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Button from "react-bootstrap/esm/Button";
 import Form from "react-bootstrap/esm/Form";
 import Spinner from "react-bootstrap/esm/Spinner";
@@ -39,10 +39,34 @@ export function AdminPageContentUpdate(props: AdminPageContentUpdateProps) {
   const [loadingSetVersionUpdateSettings, setLoadingSetVersionUpdateSettings] =
     useState<boolean>(false);
   const [loadingUpdateInfo, setLoadingUpdateInfo] = useState<boolean>(false);
-  const [installCode, setInstallCode] = useState<string>(installCodeRaw);
   const [selectedChannel, setSelectedChannel] = useState<string>(
     RELEASE_CHANNELS.LATEST_RELEASE
   );
+  const [prevPropsSelectedChannel, setPrevPropsSelectedChannel] =
+    useState<string>();
+
+  // Update local state when props change
+  const propsSelectedChannel = props.versionUpdateInfo?.selectedChannel;
+  if (propsSelectedChannel !== prevPropsSelectedChannel) {
+    setPrevPropsSelectedChannel(propsSelectedChannel);
+    if (propsSelectedChannel) {
+      setSelectedChannel(propsSelectedChannel);
+    }
+  }
+
+  const appServiceAzureUrl = props.versionUpdateInfo?.appServiceAzureUrl;
+  const installCode = useMemo(() => {
+    // Map the display channel name to the PowerShell module channel name
+    const currentChannel = selectedChannel || RELEASE_CHANNELS.LATEST_RELEASE;
+    const powershellChannelName = CHANNEL_MAPPING[currentChannel] || "release";
+
+    return installCodeRaw
+      .replaceAll("{{releaseChannel}}", powershellChannelName)
+      .replaceAll(
+        "{{appServiceAzureUrl}}",
+        appServiceAzureUrl || "https://portal.azure.com/.../appServices"
+      );
+  }, [selectedChannel, appServiceAzureUrl]);
 
   const triggerUpdatePopover = useCallback(
     (buttonTrigger: boolean) => {
@@ -123,43 +147,8 @@ export function AdminPageContentUpdate(props: AdminPageContentUpdateProps) {
   );
 
   useEffect(() => {
-    // Update local state when props change
-    if (props.versionUpdateInfo?.selectedChannel) {
-      setSelectedChannel(props.versionUpdateInfo.selectedChannel);
-    }
-  }, [props.versionUpdateInfo?.selectedChannel]);
-
-  useEffect(() => {
-    let newInstallCode = installCodeRaw;
-
-    // Map the display channel name to the PowerShell module channel name
-    const currentChannel = selectedChannel || RELEASE_CHANNELS.LATEST_RELEASE;
-    const powershellChannelName = CHANNEL_MAPPING[currentChannel] || "release";
-
-    newInstallCode = newInstallCode.replaceAll(
-      "{{releaseChannel}}",
-      powershellChannelName
-    );
-
-    if (props.versionUpdateInfo?.appServiceAzureUrl) {
-      newInstallCode = newInstallCode.replaceAll(
-        "{{appServiceAzureUrl}}",
-        props.versionUpdateInfo.appServiceAzureUrl
-      );
-    } else {
-      newInstallCode = newInstallCode.replaceAll(
-        "{{appServiceAzureUrl}}",
-        "https://portal.azure.com/.../appServices"
-      );
-    }
-
-    setInstallCode(newInstallCode);
     triggerUpdatePopover(false);
-  }, [
-    selectedChannel,
-    props.versionUpdateInfo?.appServiceAzureUrl,
-    triggerUpdatePopover,
-  ]);
+  }, [triggerUpdatePopover]);
 
   function changeReleaseChannel(channelName: string) {
     setSelectedChannel(channelName); // Update local state immediately

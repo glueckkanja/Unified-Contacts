@@ -59,9 +59,13 @@ export const TeamsPage = (props: TeamsPageProps) => {
     setAdditionalPermissionsGrantDialogOpen,
   ] = useState<boolean>(false);
   const [hideAdditionalPermissionsGrant, setHideAdditionalPermissionsGrant] =
-    useState<boolean>(false);
+    useState<boolean>(() =>
+      cachingService.getAdditionalPermissionsGrantSetting()
+    );
   const [lang, setLang] = useState<string>("en");
-  const [isAppInitialized, setIsAppInitialized] = useState<boolean>(false);
+  const [isAppInitialized, setIsAppInitialized] = useState<boolean>(() =>
+    app.isInitialized()
+  );
   const [tenantId, setTenantId] = useState<string>(
     "7ca2c3cc-3866-4c88-8ba7-8572990c950a"
   );
@@ -205,7 +209,6 @@ export const TeamsPage = (props: TeamsPageProps) => {
 
   useEffect(() => {
     const isInitialized = app.isInitialized();
-    setIsAppInitialized(isInitialized);
     if (!isInitialized) {
       app.initialize();
     }
@@ -238,13 +241,10 @@ export const TeamsPage = (props: TeamsPageProps) => {
         setVersionInfo(value);
       }
     });
-    setHideAdditionalPermissionsGrant(
-      cachingService.getAdditionalPermissionsGrantSetting()
-    );
   }, []);
 
   useEffect(() => {
-    // Update the document title using the browser API
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- state is only set after await
     checkAdminGrant();
     getCurrentDatabaseInfo();
   }, [checkAdminGrant, getCurrentDatabaseInfo]);
@@ -275,6 +275,7 @@ export const TeamsPage = (props: TeamsPageProps) => {
               )}
               {props.pageType === PAGE_TYPE.SEARCH && (
                 <SearchPageSearchBox
+                  key={tenantId}
                   theme={theme}
                   checkAdminGrant={checkAdminGrant}
                   tenantId={tenantId}

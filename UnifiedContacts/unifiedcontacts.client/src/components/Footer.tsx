@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StaticSettings } from "../StaticSettings";
 import { Warning24Regular } from "@fluentui/react-icons";
 import { Tooltip } from "@fluentui/react-tooltip";
@@ -9,7 +9,9 @@ export type FooterProps = {
   versionInfo?: TGeneralGetVersion;
 };
 export const FooterPage = (props: FooterProps) => {
-  const [isMobileVersion, setIsMobileVersion] = useState(false);
+  const [isMobileVersion, setIsMobileVersion] = useState(
+    () => window.innerWidth <= 1100
+  );
 
   const handleResize = useCallback(() => {
     if (window.innerWidth > 1100 && isMobileVersion) {
@@ -20,7 +22,6 @@ export const FooterPage = (props: FooterProps) => {
   }, [isMobileVersion]);
 
   useEffect(() => {
-    handleResize();
     window.addEventListener("resize", handleResize);
     return () => {
       window.removeEventListener("resize", handleResize);
@@ -73,10 +74,7 @@ export const FooterPage = (props: FooterProps) => {
     }
   };
 
-  const copyrightFooter = useMemo(getCopyrightFooter, [
-    isMobileVersion,
-    props.versionInfo,
-  ]);
+  const copyrightFooter = getCopyrightFooter();
 
   return (
     <div className="footer">

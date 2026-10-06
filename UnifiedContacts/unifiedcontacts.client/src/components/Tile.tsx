@@ -93,22 +93,6 @@ export function Tile(props: TileProps) {
       copyToClipBoardLegacy(value);
     }
   }
-  useEffect(() => {
-    let currentTilesImAdress = "";
-    if (props.searchResult.imAddresses && props.searchResult.imAddresses[0]) {
-      currentTilesImAdress = props.searchResult.imAddresses[0].toLowerCase();
-    } else if (emailArray.length > 0) {
-      currentTilesImAdress = emailArray[0].toLowerCase();
-    }
-    if (
-      (props.currentUser.oid === props.searchResult.id?.split("_")[1] ||
-        props.currentUser.preferred_username.toLowerCase() ===
-          currentTilesImAdress) &&
-      !isCurrentUser
-    ) {
-      setIsCurrentUserTrue();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (props.searchResult.addresses) {
     if (props.searchResult.addresses.business?.IsNullOrEmpty() === false) {
@@ -183,6 +167,23 @@ export function Tile(props: TileProps) {
   });
 
   phoneArray = phoneBusinessArray.concat(phoneMobileArray);
+
+  useEffect(() => {
+    let currentTilesImAdress = "";
+    if (props.searchResult.imAddresses && props.searchResult.imAddresses[0]) {
+      currentTilesImAdress = props.searchResult.imAddresses[0].toLowerCase();
+    } else if (emailArray.length > 0) {
+      currentTilesImAdress = emailArray[0].toLowerCase();
+    }
+    if (
+      (props.currentUser.oid === props.searchResult.id?.split("_")[1] ||
+        props.currentUser.preferred_username.toLowerCase() ===
+          currentTilesImAdress) &&
+      !isCurrentUser
+    ) {
+      setIsCurrentUserTrue();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   emailArray.forEach((item) => {
     emailArrayHTML.push(

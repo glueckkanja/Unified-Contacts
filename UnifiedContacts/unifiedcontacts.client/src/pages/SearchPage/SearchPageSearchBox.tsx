@@ -24,7 +24,6 @@ import {
   TUnifiedContactsSearchResponse,
   TUnifiedContactsSearchResponseSearchResult,
 } from "../../types/Types";
-import { useBoolean } from "@fluentui/react-hooks";
 import {
   ALERT_TYPE,
   SORT_CATEGORY,
@@ -81,40 +80,34 @@ export function SearchPageSearchBox(props: SearchPageSearchBoxProps) {
   const teamsContext = useTeamsContext();
   const pollingIntervalId = useRef<NodeJS.Timeout>();
   const [searchQuery, setSearchQuery] = useState(
-    cachingService.getCachedSearchQuery(props.tenantId)
+    () => cachingService.getCachedSearchQuery(props.tenantId) ?? ""
   );
-  const [
-    initialCacheLoadCompleted,
-    {
-      setTrue: setInitialCacheLoadCompletedTrue,
-      setFalse: setInitialCacheLoadCompletedFalse,
-    },
-  ] = useBoolean(false);
 
-  const [allSearchState, setAllSearchState] = useState<TUnfiedSearchState>({
-    loading: false,
-    allSearchResults: cachingService.getCachedSearchResults(props.tenantId),
-    sortSetting: cachingService.getCachedSortSetting(props.tenantId),
-  });
+  const [allSearchState, setAllSearchState] = useState<TUnfiedSearchState>(
+    () =>
+      props.tenantId
+        ? {
+            loading: false,
+            allSearchResults: cachingService.getCachedSearchResults(
+              props.tenantId
+            ),
+            sortSetting: cachingService.getCachedSortSetting(props.tenantId),
+          }
+        : {
+            loading: false,
+            allSearchResults: [],
+            sortSetting: {
+              sortType: SORT_TYPE.UNSORTED,
+              sortCategory: undefined,
+            },
+          }
+  );
   const [allPresenceResults, setAllPresenceResults] = useState<
     TUnifiedContactsPresenceResponse[]
   >([]);
   const [allPhotosResults, setAllPhotosResults] = useState<
     TUnifiedContactsImageResponse[]
-  >(cachingService.getContactImageCache(props.tenantId) ?? []);
-
-  const loadCache = useCallback(() => {
-    setAllPhotosResults(
-      cachingService.getContactImageCache(props.tenantId) ?? []
-    );
-    setAllSearchState({
-      loading: false,
-      allSearchResults: cachingService.getCachedSearchResults(props.tenantId),
-      sortSetting: cachingService.getCachedSortSetting(props.tenantId),
-    });
-    global_sourcesLoading.isUCSearchLoading = false;
-    setSearchQuery(cachingService.getCachedSearchQuery(props.tenantId) ?? "");
-  }, [props.tenantId]);
+  >(() => cachingService.getContactImageCache(props.tenantId) ?? []);
 
   const onSearchResultChange = (searchState: TUnfiedSearchState) => {
     setAllSearchState({
@@ -652,27 +645,12 @@ export function SearchPageSearchBox(props: SearchPageSearchBoxProps) {
     });
   };
 
+  // Component is remounted per tenant (key), so this runs once per tenant
   useEffect(() => {
     cancelAllPromises(global_searchResultPendingPromises);
     global_searchResultPendingPromises = [];
-    setInitialCacheLoadCompletedFalse();
-    if (props.tenantId) {
-      loadCache();
-    } else {
-      setAllSearchState({
-        loading: false,
-        allSearchResults: [],
-        sortSetting: { sortType: SORT_TYPE.UNSORTED, sortCategory: undefined },
-      });
-    }
     global_sourcesLoading.isUCSearchLoading = false;
-    setInitialCacheLoadCompletedTrue();
-  }, [
-    props.tenantId,
-    loadCache,
-    setInitialCacheLoadCompletedFalse,
-    setInitialCacheLoadCompletedTrue,
-  ]);
+  }, []);
 
   useEffect(() => {
     updatePresence();
@@ -704,20 +682,18 @@ export function SearchPageSearchBox(props: SearchPageSearchBoxProps) {
         </div>
       </div>
       <div className="search-page__search-results__wrapper">
-        {initialCacheLoadCompleted && (
-          <SearchResult
-            searchState={allSearchState}
-            searchQuery={searchQuery}
-            presence={allPresenceResults}
-            photos={allPhotosResults}
-            tenantId={props.tenantId}
-            backendConfig={props.backendConfig}
-            currentUser={props.currentUser}
-            updateFavoriteFlagCallback={updateFavoriteFlagCallback}
-            loadingAlertId={global_loadingAlertId}
-            onSearchResultChange={onSearchResultChange}
-          />
-        )}
+        <SearchResult
+          searchState={allSearchState}
+          searchQuery={searchQuery}
+          presence={allPresenceResults}
+          photos={allPhotosResults}
+          tenantId={props.tenantId}
+          backendConfig={props.backendConfig}
+          currentUser={props.currentUser}
+          updateFavoriteFlagCallback={updateFavoriteFlagCallback}
+          loadingAlertId={global_loadingAlertId}
+          onSearchResultChange={onSearchResultChange}
+        />
       </div>
     </>
   );
