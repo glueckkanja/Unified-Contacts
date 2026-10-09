@@ -4,8 +4,8 @@ run-name: Build and Release Unified Contacts
 # Mapping:
 #   Push to main                -> Creates tag and prerelease including binaries - Set to release manually.
 #   Dispatch on main            -> Skip execution completely to avoid multiple releases on the same main branch commit.
-#   Dispatch on other branches  -> Creates a tag and draft release including binaries.
-#   Pull request targeting main -> Creates a tag and draft release including binaries.
+#   Dispatch on other branches  -> Creates versioned binaries only (no tag, no release).
+#   Pull request targeting main -> Creates versioned binaries only (no tag, no release).
 
 concurrency:
   group: "Create Unified Contacts Release"
@@ -28,7 +28,7 @@ env:
 
 jobs:
   generate_version:
-    name: Generate version and draft release
+    name: Generate version
     if: ${{ !(github.event_name == 'workflow_dispatch' && github.ref_name == 'main') }}
     runs-on: ubuntu-latest
     permissions:
@@ -44,6 +44,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           is_prerelease: true
           is_draft_release: true
+          suppress_tag: ${{ !(github.event_name == 'push' && github.ref_name == 'main') }}
 
   build:
     name: Build Unified Contacts
@@ -182,6 +183,7 @@ jobs:
 
   publish_release:
     name: Attach assets and publish release
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # allows uploading assets and publishing releases
@@ -200,4 +202,4 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         release_id: ${{ needs.generate_version.outputs.release_id }}
         asset_path: "release_assets"
-        publish_draft_release: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+        publish_draft_release: true
