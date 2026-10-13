@@ -32,13 +32,13 @@ namespace UnifiedContacts.Controllers
     public class SearchController : ControllerBase
     {
         private readonly Dictionary<string, SourceDetails> _sourceDict;
-        private readonly TelemetryClient _telemetry;
+        private readonly TelemetryClient? _telemetry;
         private readonly TelemetryEngine _telemetryEngine;
         private readonly FavoritesRepository _favoritesRepository;
         private readonly UsageRepository _licensingRepository;
         private readonly RuntimeInfoDto _startupInfo;
 
-        public SearchController(TelemetryClient telemetry, TelemetryEngine telemetryEngine, SearchEngineFactory searchEngineFactory, FavoritesRepository favoritesRepository, UsageRepository licensingRepository, RuntimeInfoDto startupInfo)
+        public SearchController(TelemetryEngine telemetryEngine, SearchEngineFactory searchEngineFactory, FavoritesRepository favoritesRepository, UsageRepository licensingRepository, RuntimeInfoDto startupInfo, TelemetryClient? telemetry = null)
         {
             _telemetry = telemetry;
             _telemetryEngine = telemetryEngine;
@@ -143,7 +143,7 @@ namespace UnifiedContacts.Controllers
                     searchQuery = "a";
                 }
 
-                _telemetry.TrackEvent($"{source}SearchCalled", _telemetryEngine.CollectCallerTelemetryInfo(User));
+                _telemetry?.TrackEvent($"{source}SearchCalled", _telemetryEngine.CollectCallerTelemetryInfo(User));
                 _licensingRepository.RegisterUsage(User).Forget();
 
                 string delegatedToken = Request.Headers[HeaderNames.Authorization].ToString().Replace("Bearer", string.Empty).Replace(" ", string.Empty);

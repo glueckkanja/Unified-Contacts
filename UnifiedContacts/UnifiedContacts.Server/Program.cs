@@ -354,11 +354,7 @@ if (!string.IsNullOrWhiteSpace(aiConnectionString))
     aiOptions.ConnectionString = aiConnectionString;
     builder.Services.AddApplicationInsightsTelemetry(aiOptions); // This already injects the TelemetryClient
 }
-else
-{
-    // v3's OpenTelemetry-based exporter throws at startup without a connection string; register a disabled client instead so DI still resolves
-    builder.Services.AddSingleton(new TelemetryClient(new TelemetryConfiguration { DisableTelemetry = true }));
-}
+// Without a connection string no TelemetryClient is registered: a manually constructed v3 client throws NullReferenceException on Track* calls
 builder.Services.AddHttpClient("default");
 
 builder.Services.AddControllers().AddJsonOptions(options =>
