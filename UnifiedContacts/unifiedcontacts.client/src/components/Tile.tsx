@@ -54,7 +54,6 @@ type TileProps = {
 export function Tile(props: TileProps) {
   let image = "";
   let phoneBusinessArray: string[] = [];
-  let phoneArray: string[] = [];
   let phoneMobileArray: string[] = [];
   let emailArray: string[] = [];
   let imEmailArray: string[] = [];
@@ -166,7 +165,7 @@ export function Tile(props: TileProps) {
     return element?.IsNullOrEmpty() === false;
   });
 
-  phoneArray = phoneBusinessArray.concat(phoneMobileArray);
+  const phoneArray = phoneBusinessArray.concat(phoneMobileArray);
 
   useEffect(() => {
     let currentTilesImAdress = "";

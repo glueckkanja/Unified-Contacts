@@ -101,7 +101,7 @@ export function SearchResult(props: SearchResultProps) {
   }, [props.searchState.sortSetting, props.searchState.allSearchResults]);
 
   const sortSearchResult = () => {
-    let searchResultsBuffer: TUnifiedContactsSearchResponseSearchResult[] = [];
+    let searchResultsBuffer: TUnifiedContactsSearchResponseSearchResult[];
     if (props.loadingAlertId && !props.searchState.loading && teamsAlertService) {
       teamsAlertService.removeAlert(props.loadingAlertId);
     }

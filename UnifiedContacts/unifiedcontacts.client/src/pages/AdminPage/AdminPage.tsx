@@ -231,9 +231,7 @@ export function AdminPage() {
     return postAdminControllerUploadManifestInfo().then(() => {
       if (teamsManifestInfo) {
         setTeamsManifestInfo((oldTeamsManifestInfo) => {
-          let newTeamsManifestInfo:
-            | TAdminControllerGetManifestInfo
-            | undefined = undefined;
+          let newTeamsManifestInfo: TAdminControllerGetManifestInfo;
           if (!oldTeamsManifestInfo) {
             newTeamsManifestInfo = {
               ...teamsManifestInfo,
