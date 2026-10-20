@@ -1,4 +1,9 @@
-import LocalizedStrings, { LocalizedStringsMethods } from "react-localization";
+import LocalizedStringsModule, { LocalizedStringsMethods } from "react-localization";
+
+// Vite 8 resolves this CJS default import to module.exports instead of exports.default
+const LocalizedStrings =
+  (LocalizedStringsModule as unknown as { default?: typeof LocalizedStringsModule }).default ??
+  LocalizedStringsModule;
 
 export interface IStrings extends LocalizedStringsMethods {
   searchPageHeadline: string;
